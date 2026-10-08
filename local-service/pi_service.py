@@ -13,6 +13,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 TOKEN = secrets.token_urlsafe(24)
 MODEL = os.environ.get('PI_MODEL', 'qwen3:4b')
@@ -38,10 +39,28 @@ def chat(prompt, schema):
     try:
         with urlopen(request, timeout=900) as response:
             output = json.load(response)
-        return json.loads(output['message']['content'])
+    except HTTPError as error:
+        if error.code == 404:
+            detail = f'Ollama could not find drafting model {MODEL}. Run ollama pull {MODEL} in another Terminal window.'
+        elif error.code == 400:
+            detail = 'Ollama rejected the structured drafting request (HTTP 400). Check your Ollama version and update it.'
+        elif error.code >= 500:
+            detail = f'Ollama could not run the drafting model (HTTP {error.code}). Check available memory and test the model directly.'
+        else:
+            detail = f'Ollama returned HTTP {error.code}; no report was generated.'
+        raise ValueError(detail) from error
+    except (TimeoutError, URLError) as error:
+        raise ValueError('Cannot complete the local Ollama request. Make sure Ollama is running at 127.0.0.1:11434; a timeout may also indicate slow model processing.') from error
     except Exception as error:
-        # Never expose provider responses or source text in errors.
-        raise ValueError('Local model request failed. Check that Ollama is running and the selected model is installed.') from error
+        raise ValueError('Ollama returned an unreadable response; no report was generated.') from error
+    try:
+        result = json.loads(output['message']['content'])
+        if not isinstance(result, dict) or not isinstance(result.get('fields'), dict):
+            raise ValueError('Invalid fields')
+        return result
+    except Exception as error:
+        # Distinguish formatting failures from a missing model; never expose response/source text.
+        raise ValueError('The local model did not return a complete structured report. Try a shorter source or the compact SOAP template first; this is a model-output error, not missing patient findings.') from error
 
 
 CITATION_SCHEMA = {'type': 'object', 'properties': {'source_id': {'type': 'string'}, 'page': {'type': 'integer'}, 'quote': {'type': 'string'}}, 'required': ['source_id', 'page', 'quote'], 'additionalProperties': False}

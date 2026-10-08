@@ -114,7 +114,7 @@ def match_sources(sources, templates):
                 else: groups[key]['citations']+=item['citations']
             candidates=list(groups.values())
             fields[f['id']]={'text':candidates[0]['text'] if len(candidates)==1 else '', 'citations':candidates[0]['citations'] if len(candidates)==1 else [],'candidates':candidates,'conflict':len(candidates)>1,'resolved':False,'edited':False}
-        output[template['id']]={'template_id':template['id'],'status':'draft','fields':fields}
+        output[template['id']]={'template_id':template['id'],'status':'draft','generation_method':'source_headings','fields':fields}
     return output
 
 
@@ -126,16 +126,30 @@ def administrative_report(case, template):
     return {'template_id':template['id'],'status':'draft','administrative':True,'fields':fields}
 
 
+DEMO_SOURCE_NAME = 'Fictional test evaluation — not a real patient'
+DEMO_SENTENCE = 'Not documented in this fictional workflow test; clinician completion required.'
+
+def is_demo_source(source):
+    return source.get('demo') is True or source.get('name') == DEMO_SOURCE_NAME
+
+def evidence_sources(case, include_demo=False):
+    return [s for s in case['sources'] if s.get('kind') != 'template' and s.get('included', True) is not False and (include_demo or not is_demo_source(s))]
+
+
 def process(case, templates, progress):
-    sources = [{k:s[k] for k in ['id','name','pages','kind']} for s in case['sources'] if s.get('kind')!='template']
-    if not sources and any(not t.get('administrative') for t in templates): raise ValueError('Add clinical evidence. Template references are excluded from generation.')
+    sources = [{k:s[k] for k in ['id','name','pages','kind']} for s in evidence_sources(case)]
+    if not sources and any(not t.get('administrative') for t in templates): raise ValueError('Add and include case evidence first. Demo notes and template references are excluded from AI generation.')
     reports = {}
     for i, template in enumerate(templates):
         if template.get('administrative'):
             reports[template['id']]=administrative_report(case,template); continue
         def stage(text): progress(f"Report {i+1}/{len(templates)}: {text}")
         packet = ai.draft({'case_label':case['case_label'],'encounter':case['encounter'],'template':template,'sources':sources},stage)
-        reports[template['id']] = packet['report']
+        report = packet['report']
+        report['generation_method'] = 'local_ai'
+        report['generated_at'] = time.time()
+        report['used_source_ids'] = [s['id'] for s in sources]
+        reports[template['id']] = report
     return reports
 
 
@@ -292,21 +306,32 @@ class Handler(ai.Handler):
                     con.execute('INSERT INTO cases VALUES (?,?,?,?)',(case['id'],owner,1,json.dumps(case)))
                     con.execute('INSERT INTO audit VALUES (?,?,?,?)',(time.time(),user['name'],case['id'],'created'))
                 self.send(201,case); return
-            match=re.fullmatch(r'/api/cases/([a-f0-9]+)/(sources|generate|reports|approve|match)',path)
+            match=re.fullmatch(r'/api/cases/([a-f0-9]+)/(sources|source_selection|details|generate|reports|approve|match)',path)
             if not match: self.send(404,{'error':'Unknown endpoint.'}); return
             case=get_case(user,match[1]); version=body.get('version')
             if version!=case['version']: raise ValueError('Case changed. Reload before applying edits.')
             action=match[2]
+            if action=='details':
+                name=body.get('case_label',''); encounter=body.get('encounter','')
+                if not isinstance(name,str) or not name.strip() or len(name)>300 or not isinstance(encounter,str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',encounter): raise ValueError('Patient label and encounter date are required.')
+                case['case_label']=name.strip(); case['encounter']=encounter; invalidate(case)
+                self.send(200,save_case(user,case,version,'case details edited; approvals cleared')); return
+            if action=='source_selection':
+                source=next((s for s in case['sources'] if s['id']==body.get('source_id')),None)
+                if not source or type(body.get('included')) is not bool: raise ValueError('Invalid source selection.')
+                if body['included'] and (source.get('kind')=='template' or is_demo_source(source)): raise ValueError('Demo notes and template references cannot be used as AI evidence.')
+                source['included']=body['included']; invalidate(case)
+                self.send(200,save_case(user,case,version,'evidence selection edited; approvals cleared')); return
             if action=='sources':
                 source=body.get('source',{}); pages=source.get('pages'); kind=source.get('kind','clinical'); name=source.get('name','')
                 if not isinstance(name,str) or not name.strip() or len(name)>300 or kind not in ['clinical','police','imaging','transcript','template'] or not isinstance(pages,list) or not pages or len(pages)>500 or any(not isinstance(p,str) for p in pages): raise ValueError('Invalid source.')
                 if len(case['sources'])>=20 or sum(len(p) for s in case['sources'] for p in s['pages'])+sum(map(len,pages))>2000000: raise ValueError('Case source limit reached.')
-                case['sources'].append({'id':secrets.token_hex(12),'name':name,'pages':pages,'kind':kind}); invalidate(case)
+                case['sources'].append({'id':secrets.token_hex(12),'name':name,'pages':pages,'kind':kind,'demo':bool(source.get('demo'))}); invalidate(case)
                 self.send(200,save_case(user,case,version,'source added; approvals cleared')); return
             if action=='match':
                 ids=body.get('templates',[]); chosen=[t for t in TEMPLATES if t['id'] in ids]
                 if not chosen or len(chosen)!=len(set(ids)): raise ValueError('Select supported report templates.')
-                case['reports'].update(match_sources([s for s in case['sources'] if s['kind']!='template'],[t for t in chosen if not t.get('administrative')]))
+                case['reports'].update(match_sources(evidence_sources(case,include_demo=True),[t for t in chosen if not t.get('administrative')]))
                 for t in chosen:
                     if t.get('administrative'): case['reports'][t['id']]=administrative_report(case,t)
                 self.send(200,save_case(user,case,version,'source headings matched (no AI)')); return
@@ -330,6 +355,7 @@ class Handler(ai.Handler):
                 self.send(200,save_case(user,case,version,'draft edited; approval cleared')); return
             if user['role']!='clinician': raise PermissionError('Only the clinician can approve clinical reports.')
             if not body.get('confirmed') or not report or any(not v['text'].strip() for v in report['fields'].values()): raise ValueError('Review and complete all fields or explain why information is not documented.')
+            if evidence_sources(case) and any(DEMO_SENTENCE in v['text'] for v in report['fields'].values()): raise ValueError('This report contains the old fictional test text. Generate a new draft from the included case evidence before approval.')
             report.update(status='reviewed_unsigned',reviewed_at=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),reviewed_by=user['name'])
             self.send(200,save_case(user,case,version,'clinician approved unsigned draft'))
         except PermissionError as e: self.send(403,{'error':str(e)})

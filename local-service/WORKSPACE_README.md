@@ -68,3 +68,20 @@ Stop with Control-C. Keep the folder to retain cases. Subsequent startup uses th
 ## Evidence from development
 
 Browser tests exercised worker intake, the 29-section template, clinician-only approval, saved cases after reload, PDF parsing and the bridge's changed-case check. Server tests checked worker case isolation, approval restrictions, conflicting evidence, template-reference exclusion, batch generation with model stubs and concurrent editing. Full model inference, actual Mac installation, private remote access and Jane's live editor still require the staged trial above.
+
+## Existing case shows old fictional text after generation
+
+The fictional test note is now automatically excluded from local AI evidence, including copies created by older releases. Expand a source in Evidence to see whether it is included; template references and the supplied demo note cannot be used as AI evidence. Use **Edit case label / encounter** to give an existing test case the appropriate case label and evaluation date without re-uploading evidence.
+
+A failed generation clearly labels the previous saved draft and reports the error. It never counts the old fictional text as the new AI result. New reports indicate whether they came from local AI or source-heading matching. Approval of an old fictional draft is blocked once new case evidence has been added.
+
+For an existing installation, stop Pi with Control-C, keep Terminal in your existing workspace folder and extract the small update there:
+
+```sh
+unzip -o ~/Downloads/Pi-Workspace-Generation-Fix.zip -d .
+python3 workspace_server.py
+```
+
+The patch contains only application code and instructions. It does not contain or replace `private-data` or `.venv`; your cases, uploads and passwords stay in place. If you normally launch with `.venv/bin/python`, use that same Python command after updating. Sign in again and reload the page. Do not replace or delete the entire existing workspace folder.
+
+Check `ollama list` in another Terminal window. A working Whisper transcription does not establish that the Ollama drafting model is available. The configured model is `qwen3:4b` unless PI_MODEL is set. Updated errors distinguish a stopped/unreachable service, missing model, model run failures and incomplete JSON output. Start Ollama and install the specified model if missing. If a model-output error occurs, try the compact SOAP report and a short, verified note first. Missing or unverified clinical findings remain blank.

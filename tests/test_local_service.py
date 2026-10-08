@@ -5,7 +5,7 @@ import threading
 import time
 import unittest
 from unittest.mock import patch
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 spec = importlib.util.spec_from_file_location('pi_service', Path(__file__).resolve().parents[1] / 'local-service/pi_service.py')
@@ -49,6 +49,18 @@ class EvidenceTests(unittest.TestCase):
     def test_wrong_page_references_rejected(self):
         citation = response()['fields']['soap_1']['citations'][0]; citation['page'] = 2
         self.assertEqual(service.checked_citations([citation], case()['sources']), [])
+
+    def test_model_connection_and_missing_model_errors_are_distinct(self):
+        with patch.object(service, 'urlopen', side_effect=URLError('refused')):
+            with self.assertRaisesRegex(ValueError, 'Ollama is running'): service.chat('Fictional input', {})
+        with patch.object(service, 'urlopen', side_effect=HTTPError('http://127.0.0.1:11434',404,'Missing',{},None)):
+            with self.assertRaisesRegex(ValueError, 'ollama pull'): service.chat('Fictional input', {})
+
+    def test_incomplete_model_json_is_not_misreported_as_missing_model(self):
+        import io
+        response = io.BytesIO(json.dumps({'message':{'content':'{"fields":'}}).encode())
+        with patch.object(service, 'urlopen', return_value=response):
+            with self.assertRaisesRegex(ValueError, 'model-output error'): service.chat('Fictional input', {})
 
 
 class ConnectionTests(unittest.TestCase):

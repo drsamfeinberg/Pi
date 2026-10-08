@@ -93,4 +93,24 @@ class WorkspaceTests(unittest.TestCase):
   self.assertIn('UNSIGNED FORM',result['fields']['lien_4']['text'])
   self.assertNotIn('Ted Test',json.dumps(result))
 
+ def test_ai_excludes_legacy_demo_and_deselected_evidence(self):
+  case={'case_label':'Fictional test with new evidence','encounter':'2026-01-15','sources':[{'id':'demo','name':app.DEMO_SOURCE_NAME,'kind':'clinical','pages':[app.DEMO_SENTENCE]},{'id':'real','name':'New evaluation note','kind':'clinical','pages':['Patient-reported symptom.']},{'id':'exclude','name':'Unselected document','kind':'clinical','included':False,'pages':['Other statement.']}]}
+  template=next(t for t in app.TEMPLATES if t['id']=='soap')
+  def model(payload,progress):
+   self.assertEqual([s['id'] for s in payload['sources']],['real'])
+   return {'report':{'template_id':'soap','status':'draft','fields':{'soap_1':{'text':'Patient-reported symptom.'}}}}
+  with patch.object(app.ai,'draft',side_effect=model): report=app.process(case,[template],lambda stage:None)['soap']
+  self.assertEqual(report['used_source_ids'],['real']);self.assertEqual(report['generation_method'],'local_ai')
+ def test_source_selection_and_rename_keep_uploads_and_prevent_old_demo_approval(self):
+  worker=self.login('worker');clinician=self.login('clinician');case=self.newcase(worker);cid=case['id']
+  text='\n\n'.join(f"{f['label']}: {app.DEMO_SENTENCE}" for f in next(t for t in app.TEMPLATES if t['id']=='soap')['fields'])
+  case=self.api('/cases/'+cid+'/sources',{'version':case['version'],'source':{'name':app.DEMO_SOURCE_NAME,'kind':'clinical','pages':[text]}},worker)
+  case=self.api('/cases/'+cid+'/match',{'version':case['version'],'templates':['soap']},worker)
+  case=self.api('/cases/'+cid+'/sources',{'version':case['version'],'source':{'name':'New verified evidence','kind':'clinical','pages':['New verified facts.']}},worker)
+  with self.assertRaises(HTTPError):self.api('/cases/'+cid+'/approve',{'version':case['version'],'template_id':'soap','confirmed':True},clinician)
+  case=self.api('/cases/'+cid+'/details',{'version':case['version'],'case_label':'De-identified actual trial','encounter':'2026-01-15'},worker)
+  self.assertEqual(len(case['sources']),2)
+  sid=case['sources'][1]['id'];case=self.api('/cases/'+cid+'/source_selection',{'version':case['version'],'source_id':sid,'included':False},worker)
+  self.assertEqual(app.evidence_sources(case),[])
+
 if __name__=='__main__':unittest.main()
