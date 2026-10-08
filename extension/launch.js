@@ -1,0 +1,1 @@
+document.getElementById('open').addEventListener('click',async()=>{try{const [tab]=await PiExtension.tabs.query({active:true,currentWindow:true});await PiExtension.tabs.create({url:PiExtension.runtime.getURL('workspace.html')+'?tab='+tab.id});window.close();}catch(error){document.getElementById('result').textContent=error.message;}});

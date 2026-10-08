@@ -1,9 +1,8 @@
-# Chrome extension download
+# Pi Mac prototype downloads
 
-[Download the Chrome publishing-review ZIP](pi-chrome-web-store-review.zip).
+- [Chrome extension ZIP](pi-chrome-web-store-review.zip), version 0.2.0: direct document intake, local transcription/drafting connection, review and Jane field mapping.
+- [Local Mac service ZIP](Pi-Local-Service-Mac.zip): installer, startup script, local Whisper/Ollama service and instructions.
 
-This archive contains the Pi Jane Draft Bridge prototype, version 0.1.0. `manifest.json` is at the archive root so the ZIP can be uploaded for Chrome Web Store review. No patient documents or credentials are included.
+Unzip the extension and select its folder containing `manifest.json` in Chrome's Load unpacked dialog. Update an existing installation by replacing its folder contents and clicking Reload. The local service is installed separately using its included README. No DMG or Apple developer subscription is required.
 
-For local testing on a Mac, unzip the file, open `chrome://extensions`, enable Developer mode, select Load unpacked, and choose the extracted folder containing `manifest.json`. The extension has not been verified against Jane's live editor or approved by the Chrome Web Store.
-
-The companion `.sha256` file records the archive checksum. A DMG is not required.
+No patient records or credentials are included. The packages are prototypes: Mac installation, full model inference and live Jane editor compatibility still need validation. The extension has not been approved by the Chrome Web Store. Companion SHA-256 files record the downloads' checksums.

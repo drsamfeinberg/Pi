@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pi · Jane draft bridge</title><link rel="stylesheet" href="popup.css"><script src="api.js"></script><script src="bridge.js"></script><script src="core.js"></script><script src="intake.js" defer></script><script src="popup.js" defer></script></head>
+<body class="workspace"><header><h1>Pi</h1><span>Document intake and Jane drafts · prototype</span></header><p>Use on a de-identified test record first. Field compatibility with Jane has not been verified.</p>
+<section><h2>Local AI connection</h2><p>Start the Pi service on your Mac, then paste its pairing code. Documents and recordings are processed locally. Model downloads happen during installation.</p><label>Pairing code<input id="local-token" type="password" autocomplete="off"></label><button id="connect-local">Check local connection</button><p id="local-status">Local service not connected.</p></section>
+<section><h2>1. Patient and source documents</h2>
+<p>Choose sources for one patient and encounter. Files stay in this tab’s memory; closing or reloading loses them. Use local AI to draft from mixed documents, or the heading matcher for an offline test. Check every generated statement against its source excerpts.</p>
+<label>Case / patient label<input id="case-label" type="text"></label><label>Encounter date<input id="encounter" type="date"></label>
+<label>Documents<input id="source-files" type="file" multiple accept=".pdf,.txt,application/pdf,text/plain"></label>
+<p>Searchable PDFs and text: chart notes, police reports, radiology reports and transcripts. Scans need OCR. Upload radiologist findings rather than raw diagnostic images.</p>
+<label>Recording<input id="audio-file" type="file" accept=".mp3,.m4a,.wav,.mp4,.webm,.aac,.ogg"></label><button id="transcribe-audio">Transcribe recording locally</button><p>Transcripts are placed in the notes box for verification before you add them to the case.</p>
+<label>Doctor notes or transcript<textarea id="notes" rows="5"></textarea></label><button id="add-notes">Add notes</button><div id="sources"></div>
+<label>Report template<select id="template"></select></label><button id="ai-generate">Generate draft with local AI</button><button id="generate">Match source headings (offline test)</button>
+<h2>2. Review and edit</h2><p id="draft-status">Add sources to start.</p><div id="draft-fields"></div>
+<label class="check"><input id="confirm-review" type="checkbox">I reviewed the source passages, patient, encounter and all report sections.</label><button id="review-draft">Approve draft for filling</button><button id="copy-draft">Copy report text</button>
+</section><h2>3. Fill Jane</h2><p>Open the matching patient and encounter in the Jane tab used to launch this workspace. Scan, select each destination, verify, then fill. No JSON transfer is needed.</p>
+<details><summary>Optional: import an existing report JSON</summary><label>Reviewed report file<input id="report-file" type="file" accept=".json,application/json"></label></details><p id="report-summary"></p><button id="scan" disabled>Scan current Jane screen</button><div id="mapping"></div>
+<label class="check"><input id="confirm-patient" type="checkbox">I verified the patient and encounter against this report and checked the field mapping.</label>
+<button id="fill" disabled>Fill selected empty fields</button><p id="result" role="status" aria-live="polite"></p><footer>Runs in your existing browser session. No credentials are collected. Review the inserted text in Jane and save through Jane’s normal workflow. Rich-text support requires testing.</footer></body></html>

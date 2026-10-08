@@ -11,6 +11,8 @@ function updateStatus(){
  $('progress').textContent=s?`${s.filled} / ${s.total} sections filled · ${s.conflicts} source conflicts`:'Load the fictional case or add notes to get started.';
  $('review-state').textContent=current?(current.status==='reviewed_unsigned'?'Reviewed locally · unsigned':'DRAFT · clinician review required'):'No report built yet.';
  for(const id of ['review','export-html','export-json'])$(id).disabled=!current;
+ $('json-fallback').hidden=!current;
+ $('json-text').value=current?JSON.stringify({case_label:$('case-label').value||'Unspecified case',report:current},null,2):'';
 }
 function edited(current){current.status='draft';delete current.reviewed_at;$('review-confirm').checked=false;updateStatus();}
 function render(){
@@ -65,11 +67,14 @@ $('build').addEventListener('click',handle(()=>build()));
 $('review').addEventListener('click',handle(()=>{const current=report();reports[current.template_id]=core.review(current,$('review-confirm').checked);render();message('Marked reviewed locally. This report remains unsigned.');}));
 async function saveFile(name,text,type){
  const file=new File([text],name,{type});
- if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Pi report'});return;}
- const url=URL.createObjectURL(file),a=element('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);
+ // Download directly; an OS Share dialog can reject JSON without saving a file.
+ // Keep a visible user-clicked link available when an automatic download is blocked.
+ const url=URL.createObjectURL(file),a=$('download-link');a.href=url;a.download=name;a.textContent=`Download ${name}`;$('download-fallback').hidden=false;a.click();
+ setTimeout(()=>{URL.revokeObjectURL(url);if(a.href===url){a.removeAttribute('href');$('download-fallback').hidden=true;}},300000);
 }
-$('export-html').addEventListener('click',handle(async()=>{const current=report();await saveFile(`pi-${current.template_id}-${current.status}.html`,core.exportHTML(template(),current,$('case-label').value,$('include-references').checked),'text/html');message('Report prepared for saving. Nothing was sent to Jane or emailed.');}));
-$('export-json').addEventListener('click',handle(async()=>{const current=report();await saveFile(`pi-${current.template_id}-${current.status}.json`,JSON.stringify({case_label:$('case-label').value||'Unspecified case',report:current},null,2),'application/json');message('Report JSON prepared for saving.');}));
+$('export-html').addEventListener('click',handle(async()=>{const current=report();await saveFile(`pi-${current.template_id}-${current.status}.html`,core.exportHTML(template(),current,$('case-label').value,$('include-references').checked),'text/html');message('Download requested. If nothing appears, use the download link in Export. Nothing was sent to Jane or emailed.');}));
+$('export-json').addEventListener('click',handle(async()=>{const current=report();await saveFile(`pi-${current.template_id}-${current.status}.json`,JSON.stringify({case_label:$('case-label').value||'Unspecified case',report:current},null,2),'application/json');message('JSON download requested. If nothing appears, use the download link or JSON text in Export.');}));
+$('select-json').addEventListener('click',()=>{$('json-text').focus();$('json-text').select();message('JSON selected. Copy it and save it as a plain-text .json file if your browser blocks downloads.');});
 $('reset').addEventListener('click',()=>{if(!confirm('Clear sources and reports? Save any reports you need first.'))return;sources=[];reports={};$('case-label').value='';$('source-input').value='';$('source-title').value='';renderSources();$('fields').replaceChildren(element('p','Workspace cleared. Add sources or try the fictional case.','help'));updateStatus();message('Workspace cleared.');});
 $('demo').addEventListener('click',handle(async()=>{
  if(sources.length&&!confirm('Replace this workspace with the fictional example?'))return;

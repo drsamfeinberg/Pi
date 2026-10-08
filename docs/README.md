@@ -1,6 +1,6 @@
 # Pi — browser-only web proof of concept
 
-This is the active iPad-oriented prototype. It needs no Apple developer account, native app, browser extension, server-side application, or paid AI service. Serve these static files from an HTTPS website to use it in Safari on an iPad. The developer environment's loopback address is not reachable from the user's iPad.
+This is the earlier iPad-oriented static prototype. The current Mac workflow is described in extension/README.md and local-service/README.md. It needs no Apple developer account, native app, browser extension, server-side application, or paid AI service. Serve these static files from an HTTPS website to use it in Safari on an iPad. The developer environment's loopback address is not reachable from the user's iPad.
 
 ## What it demonstrates
 
@@ -56,4 +56,6 @@ The standalone file embeds templates, fictional examples, CSS, scripts, and the 
 
 ## Outside this proof of concept
 
-Direct Jane population, email delivery, recording transcription, OCR, AI drafting, authenticated clinical storage, and production patient-data controls remain separate work. Safari/Chrome extension packaging is deferred at the user's request.
+Direct Jane population, email delivery, recording transcription, OCR, AI drafting, authenticated clinical storage, and production patient-data controls remain separate work. The separate Chrome extension now includes document intake and a local-service connection; the static page itself has no direct Jane connection.
+
+JSON exports now download directly, with a visible retry link and a selectable JSON text backup when browser downloads are blocked.
