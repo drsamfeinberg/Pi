@@ -5,7 +5,7 @@ import argparse
 from zipfile import ZipFile, ZIP_DEFLATED
 
 ROOT = Path(__file__).resolve().parents[1]
-FILES = ["manifest.json", "api.js", "bridge.js", "content.js", "popup.js", "popup.html", "popup.css", "reports.json", "launch.js", "workspace.html", "intake.js", "core.js", "vendor/pdf.mjs", "vendor/pdf.worker.mjs", "vendor/LICENSE"]
+FILES = ["manifest.json", "api.js", "bridge.js", "content.js", "popup.js", "popup.html", "popup.css", "reports.json", "launch.js", "workspace.html", "shared.html", "shared.js", "intake.js", "core.js", "vendor/pdf.mjs", "vendor/pdf.worker.mjs", "vendor/LICENSE"]
 
 
 def package(output: Path) -> Path:

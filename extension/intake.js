@@ -2,7 +2,7 @@
 (()=>{
  const $=id=>document.getElementById(id),core=PiDemoCore;
  let sources=[],draft=null,templates=[],noteSource='Doctor notes / transcript';
- const ready=fetch(PiExtension.runtime.getURL('reports.json')).then(r=>r.json()).then(value=>{templates=value;for(const t of templates){const option=document.createElement('option');option.value=t.id;option.textContent=t.title;$('template').append(option);}});
+ const ready=fetch(PiExtension.runtime.getURL('reports.json')).then(r=>r.json()).then(value=>{templates=value;for(const t of templates){const option=document.createElement('option');option.value=t.id;option.textContent=t.title;$('template').append(option);}$('template').value='soap';});
  let processing=false;
  const localHeaders=()=>({'X-Pi-Token':$('local-token').value.trim()});
  async function request(path,options={}){if(!$('local-token').value.trim())throw new Error('Start the Mac service and enter its pairing code.');let response;try{response=await fetch('http://127.0.0.1:8765'+path,{...options,headers:{...localHeaders(),...options.headers}});}catch{throw new Error('Cannot connect to the local service. Start Start.command on your Mac and reload the extension after updating its permissions.');}const value=await response.json();if(!response.ok)throw new Error(value.error||'Local service request failed.');return value;}

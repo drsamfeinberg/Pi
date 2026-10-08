@@ -15,7 +15,7 @@ async function tab(){
   return active;
 }
 async function install(tabId){await PiExtension.scripting.executeScript({target:{tabId},files:['content.js']});}
-function reset(){fields=[];scannedTab=null;$('mapping').replaceChildren();$('fill').disabled=true;$('confirm-patient').checked=false;}
+function reset(){fields=[];scannedTab=null;$('mapping').replaceChildren();$('fill').disabled=true;$('remember-mapping').disabled=true;$('confirm-patient').checked=false;}
 function clearApproved(){report=null;reset();$('scan').disabled=true;$('report-summary').textContent='Draft changed. Review it before filling Jane.';}
 window.addEventListener('pi-draft-edited',clearApproved);
 window.addEventListener('pi-reviewed',event=>handle(async()=>{
@@ -32,17 +32,21 @@ $('scan').addEventListener('click',handle(async()=>{
   reset();const active=await tab();await install(active.id);const result=await PiExtension.tabs.sendMessage(active.id,{action:'pi-scan'});if(result.error)throw new Error(result.error);
   scannedTab={id:active.id,url:active.url};fields=result.fields;
   if(!fields.length)throw new Error('No supported visible editable fields found. Open the template editor. Editors in iframes require a separate adapter.');
+  let remembered={};try{remembered=JSON.parse(localStorage.getItem('pi-template-mapping-'+report.templateId)||'{}');}catch{}
+  const fieldLabel=label=>label.replace(/^\d+\.\s*/, '');
   for(const section of report.sections){
     const box=node('div');box.className='section';const label=node('label',section.label);const select=node('select');select.dataset.section=section.id;
     const skip=node('option','Do not fill this section');skip.value='';select.append(skip);
     for(const field of fields){const option=node('option',`${field.label}${field.empty?'':' · already contains text — skipped'}`);option.value=field.id;option.disabled=!field.empty;select.append(option);}
+    const matches=fields.filter(f=>f.empty&&fieldLabel(f.label)===remembered[section.id]);if(matches.length===1)select.value=matches[0].id;
     select.addEventListener('change',()=>{$('confirm-patient').checked=false;});
     label.append(select);const excerpt=node('div',section.text);excerpt.className='excerpt';box.append(label,excerpt);$('mapping').append(box);
   }
-  $('fill').disabled=false;show('Map report sections to the correct empty fields. Existing text is protected. Nothing has been inserted yet.');
+  $('remember-mapping').disabled=false;$('fill').disabled=false;show('Map report sections to the correct empty fields. Existing text is protected. Nothing has been inserted yet.');
 }));
 $('fill').addEventListener('click',handle(async()=>{
   if(!$('confirm-patient').checked)throw new Error('Verify the correct patient and encounter and confirm the mapping first.');
+  if(window.PiBeforeFill)await window.PiBeforeFill();
   const active=await tab();if(!scannedTab || active.id!==scannedTab.id || active.url!==scannedTab.url)throw new Error('The tab or page changed. Scan and map the fields again.');
   const mapping={};document.querySelectorAll('select[data-section]').forEach(e=>mapping[e.dataset.section]=e.value);
   const assignments=PiBridge.validateMapping(report.sections,mapping);
@@ -51,4 +55,11 @@ $('fill').addEventListener('click',handle(async()=>{
     show(result.results.map(r=>`${r.section}: ${r.status}${r.detail?' — '+r.detail:''}`).join('\n')+'\nReview the inserted text in Jane before saving.');
     $('confirm-patient').checked=false;
   }finally{$('fill').disabled=false;}
+}));
+
+$('remember-mapping').addEventListener('click',handle(async()=>{
+ if(!report||!scannedTab)throw new Error('Scan and map this template first.');
+ const mapping={},preferences={};document.querySelectorAll('select[data-section]').forEach(e=>{mapping[e.dataset.section]=e.value;if(e.value)preferences[e.dataset.section]=fields.find(f=>f.id===e.value).label.replace(/^\d+\.\s*/,'');});
+ PiBridge.validateMapping(report.sections,mapping);localStorage.setItem('pi-template-mapping-'+report.templateId,JSON.stringify(preferences));
+ show('Template field labels remembered. Future scans suggest uniquely matching empty fields; verify each mapping and patient before filling.');
 }));

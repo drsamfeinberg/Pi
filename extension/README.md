@@ -1,4 +1,4 @@
-# Pi extension workspace — Chrome / Edge prototype, 0.2.0
+# Pi extension workspace — Chrome / Edge prototype, 0.3.0
 
 Upload documents, transcribe recordings through a local Mac service, review draft reports and fill Jane from one extension workspace. The separate Pi webpage and JSON export are optional.
 
@@ -27,3 +27,11 @@ This is template-guided drafting with local models, not a model trained on clini
 Live Jane editor compatibility and persistence are unverified. Generic adapters support visible text inputs, textareas and some contenteditable editors; custom editors and iframes may need a dedicated adapter. Existing text is skipped, editor errors stop subsequent insertions, and partial insertion requires inspection. Patient context detection is limited; verify the patient and encounter yourself. Local review is a workflow label, not authenticated clinician attestation.
 
 Browser tests validate PDF intake, direct draft review/mapping/filling with simulated Jane APIs, WebM upload routing and local AI response handling. Service tests check pairing, origins and source references using model stubs. MP4/WebM decoding was exercised with the actual audio library on Linux. Full model inference, Mac installation, Chrome Web Store approval and live Jane integration remain untested.
+
+## Shared-case bridge
+
+Run the shared workspace described in local-service/WORKSPACE_README.md. Open a Jane test encounter, click Pi → Open shared-case bridge, enter the clinic workspace address and your workspace login, then select an assigned case and approved report. The bridge fetches the report without JSON transfer and checks its current case version immediately before filling. If the case changed, reload and remap. For private remote HTTPS workspaces, Chrome asks for access to the exact origin entered. Workspace sessions stay in extension-page memory. The newly supplied 29-section clinic evaluation structure is bundled; sample clinical findings are not.
+
+Template mappings can be remembered once per report type. Only section IDs and destination field labels are stored in extension localStorage, not source text or report content. Later scans preselect only uniquely matching empty fields; each fill still requires patient, encounter and mapping confirmation.
+
+The new supplied PI SOAP, physician, DUD/LOE, final narrative and bilingual lien templates are included in the shared schema. The lien is an unsigned administrative form; no signature or notarization is performed.

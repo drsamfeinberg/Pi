@@ -1,5 +1,250 @@
 [
   {
+    "id": "jane_evaluation",
+    "title": "Jane Initial Evaluation — clinic template",
+    "basis": "Section structure from supplied chart export. No sample values or default clinical assertions. Written diagnosis and care plans require clinician documentation.",
+    "fields": [
+      {
+        "id": "jane_eval_01",
+        "label": "Informed Consent Explanation",
+        "required": true
+      },
+      {
+        "id": "jane_eval_02",
+        "label": "First Contact Summary",
+        "required": true
+      },
+      {
+        "id": "jane_eval_03",
+        "label": "Body Chart",
+        "required": true
+      },
+      {
+        "id": "jane_eval_04",
+        "label": "Vitals Summary",
+        "required": true
+      },
+      {
+        "id": "jane_eval_05",
+        "label": "Posture Summary and Recommendations",
+        "required": true
+      },
+      {
+        "id": "jane_eval_06",
+        "label": "Chief Complaint",
+        "required": true
+      },
+      {
+        "id": "jane_eval_07",
+        "label": "Continuation of Hx",
+        "required": true
+      },
+      {
+        "id": "jane_eval_08",
+        "label": "Physical Activity",
+        "required": true
+      },
+      {
+        "id": "jane_eval_09",
+        "label": "Stress Evaluation",
+        "required": true
+      },
+      {
+        "id": "jane_eval_10",
+        "label": "Red Flag Symptoms",
+        "required": true
+      },
+      {
+        "id": "jane_eval_11",
+        "label": "Imaging Study",
+        "required": true
+      },
+      {
+        "id": "jane_eval_12",
+        "label": "ROM Examination",
+        "required": true
+      },
+      {
+        "id": "jane_eval_13",
+        "label": "Cervical Dermatomes",
+        "required": true
+      },
+      {
+        "id": "jane_eval_14",
+        "label": "Lumbar Dermatomes",
+        "required": true
+      },
+      {
+        "id": "jane_eval_15",
+        "label": "Cervical Motor Findings",
+        "required": true
+      },
+      {
+        "id": "jane_eval_16",
+        "label": "Lumbar Motor Findings",
+        "required": true
+      },
+      {
+        "id": "jane_eval_17",
+        "label": "Reflex Examination",
+        "required": true
+      },
+      {
+        "id": "jane_eval_18",
+        "label": "Orthopaedic Examination",
+        "required": true
+      },
+      {
+        "id": "jane_eval_19",
+        "label": "Spinal Examination",
+        "required": true
+      },
+      {
+        "id": "jane_eval_20",
+        "label": "Spine Notes",
+        "required": true
+      },
+      {
+        "id": "jane_eval_21",
+        "label": "Assessment/Comments",
+        "required": true
+      },
+      {
+        "id": "jane_eval_22",
+        "label": "Working Diagnosis",
+        "required": true
+      },
+      {
+        "id": "jane_eval_23",
+        "label": "In-Office Treatments",
+        "required": true
+      },
+      {
+        "id": "jane_eval_24",
+        "label": "Frequency & Duration",
+        "required": true
+      },
+      {
+        "id": "jane_eval_25",
+        "label": "Statement on Adjustive Techniques",
+        "required": true
+      },
+      {
+        "id": "jane_eval_26",
+        "label": "Goals of Treatment",
+        "required": true
+      },
+      {
+        "id": "jane_eval_27",
+        "label": "Home/Self Care Recommendations",
+        "required": true
+      },
+      {
+        "id": "jane_eval_28",
+        "label": "Additional Recommendations",
+        "required": true
+      },
+      {
+        "id": "jane_eval_29",
+        "label": "Supplement and Recovery Support Plan",
+        "required": true
+      }
+    ]
+  },
+  {
+    "id": "jane_soap",
+    "title": "PI SOAP Note — uploaded clinic template",
+    "source_template": "pi soap note template.pdf",
+    "basis": "Includes the supplied note’s subjective, objective, follow-up, prognosis, plan and treatment sections. No default diagnoses, CPT codes, adjustments or positive treatment response are copied.",
+    "fields": [
+      {
+        "id": "jane_soap_01",
+        "label": "Chief Complaint",
+        "required": true
+      },
+      {
+        "id": "jane_soap_02",
+        "label": "Spine Notes",
+        "required": true
+      },
+      {
+        "id": "jane_soap_03",
+        "label": "Adjustment Notes",
+        "required": true
+      },
+      {
+        "id": "jane_soap_04",
+        "label": "Additional Treatments",
+        "required": true
+      },
+      {
+        "id": "jane_soap_05",
+        "label": "Patient Response",
+        "required": true
+      },
+      {
+        "id": "jane_soap_06",
+        "label": "Working Diagnosis / ICD-10 (Diagnosis) Codes",
+        "required": true
+      },
+      {
+        "id": "jane_soap_07",
+        "label": "Follow-Up Status",
+        "required": true
+      },
+      {
+        "id": "jane_soap_08",
+        "label": "Current Status of Patient’s Condition",
+        "required": true
+      },
+      {
+        "id": "jane_soap_09",
+        "label": "Treatment Efficiency",
+        "required": true
+      },
+      {
+        "id": "jane_soap_10",
+        "label": "Prognosis",
+        "required": true
+      },
+      {
+        "id": "jane_soap_11",
+        "label": "In-Office Treatments",
+        "required": true
+      },
+      {
+        "id": "jane_soap_12",
+        "label": "Frequency & Duration",
+        "required": true
+      },
+      {
+        "id": "jane_soap_13",
+        "label": "Adjustive Techniques",
+        "required": true
+      },
+      {
+        "id": "jane_soap_14",
+        "label": "Goals of Treatment",
+        "required": true
+      },
+      {
+        "id": "jane_soap_15",
+        "label": "Home/Self Care Recommendations",
+        "required": true
+      },
+      {
+        "id": "jane_soap_16",
+        "label": "Additional Recommendations",
+        "required": true
+      },
+      {
+        "id": "jane_soap_17",
+        "label": "CPT Codes and Treatment Rationale",
+        "required": true
+      }
+    ]
+  },
+  {
     "id": "soap",
     "title": "SOAP / Chart Note",
     "basis": "Section structure extracted from supplied samples; formatting normalized, not a Jane App import format.",
@@ -29,7 +274,7 @@
   {
     "id": "narrative",
     "title": "Final Narrative Report",
-    "basis": "Section structure extracted from supplied samples; formatting normalized, not a Jane App import format.",
+    "basis": "Structure verified against the newly supplied clinic template. Example measurements, diagnoses, dates, billing totals, outcome scores and default clinical statements are excluded from patient findings.",
     "fields": [
       {
         "id": "narrative_1",
@@ -141,12 +386,13 @@
         "label": "Closing Statement",
         "required": true
       }
-    ]
+    ],
+    "source_template": "final narrative template.pdf"
   },
   {
     "id": "dud_loe",
     "title": "Duties Under Duress (DUD) / Loss of Enjoyment (LOE)",
-    "basis": "Section structure extracted from supplied samples; formatting normalized, not a Jane App import format.",
+    "basis": "Structure verified against the newly supplied clinic template. Example measurements, diagnoses, dates, billing totals, outcome scores and default clinical statements are excluded from patient findings.",
     "fields": [
       {
         "id": "dud_loe_1",
@@ -223,12 +469,13 @@
         "label": "Hobbies — previous activities and current difficulty/limitation",
         "required": true
       }
-    ]
+    ],
+    "source_template": "DUD LOE tempalte.pdf"
   },
   {
     "id": "physician",
     "title": "Attending Physician Report",
-    "basis": "Section structure extracted from supplied samples; formatting normalized, not a Jane App import format.",
+    "basis": "Structure verified against the newly supplied clinic template. Example measurements, diagnoses, dates, billing totals, outcome scores and default clinical statements are excluded from patient findings.",
     "fields": [
       {
         "id": "physician_1",
@@ -330,7 +577,8 @@
         "label": "Treatment details",
         "required": true
       }
-    ]
+    ],
+    "source_template": "attending physician report template.pdf"
   },
   {
     "id": "imaging",
@@ -403,6 +651,38 @@
         "id": "cover_4",
         "label": "Contact and closing",
         "required": true
+      }
+    ]
+  },
+  {
+    "id": "lien",
+    "title": "Doctor’s Third Party Lien / Assignment of Benefits — unsigned form",
+    "source_template": "lien tempalte.pdf",
+    "administrative": true,
+    "basis": "Fixed English/Spanish form wording preserved from the supplied template. This app drafts a form and does not execute signatures, record consent or certify notarization.",
+    "fields": [
+      {
+        "id": "lien_1",
+        "label": "Patient and case details",
+        "required": true
+      },
+      {
+        "id": "lien_2",
+        "label": "English notice / assignment wording",
+        "required": true,
+        "static_text": "Notice of Doctor's Third Party Lien/Assignment of Benefits\nI do hereby authorize ChiroDuo, P.L.L.C. to furnish you, my attorney, with a full report of his examination, diagnosis,\ntreatment, prognosis, etc., of myself in regard to the accident in which I was recently involved. I also acknowledge that such\ndoctor or his/her representative(s) may provide further consideration in exchange for this lien/assignment of benefits;\nincluding deposition testimony, trial testimony, and requested report(s).\n\nI hereby authorize and direct you, my current and any successor attorney(s); together with any responsible insurance\ncompany, to pay directly to ChiroDuo, P.L.L.C. such total sums as are currently due and may become due and owing him in\nthe future for all chiropractic and related services rendered me both by reason of this accident that are due his office and to\nfurther withhold such total sums from any settlement, judgment, court order, or verdict as may be necessary to adequately\nprotect and fully compensate said doctor for such total sums.\n\nI hereby further give and assign a third-party lien or assignment of benefits in accordance with North Carolina General\nStatute, Chapter 44-Liens, Article 9, Liens upon Recoveries for Personal Injuries to Secure Sums Due for Medical Attention,\nEtc. of my potential benefits/recovery on my pending/prospective case to said doctor against any and all insurance benefits,\nreferenced below, and proceeds of my settlement, judgment, court order, or verdict which may be paid to you, my attorney,\nand/or myself as a result of the injuries or illness for which I have been or will be treated from a chiropractic scope of care\nperspective in connection with such accident.\n\nPatient Financial Responsibility: In the event that my attorney(s) or insurance company does not fully satisfy the total sum\nowed to ChiroDuo, P.L.L.C., I understand and agree that I remain personally and fully responsible for any outstanding\nbalance. This includes but is not limited to co-payments, deductibles, and any amounts unpaid due to reductions by my\nattorney, insurance company, or any other third party.\nI fully understand that I am directly and fully responsible to said doctor for all chiropractic bills submitted by him for products\nand services rendered to me. This agreement is made for said doctor’s additional protection and in consideration of his\nawaiting payment and other services provided by him, as referenced above. I further understand that such payment is not\ncontingent on any settlement, judgment, court order, or verdict by which I may eventually recover said fee and that my\ndoctor may take appropriate and timely action to enforce payment against me for all such outstanding chiropractic bills.\n\nAttorney/Insurance Payment Reduction Clause: In the event that my attorney(s) or insurance company offers or agrees to\nreduce the payment to ChiroDuo, P.L.L.C. as part of a negotiated settlement, I remain fully liable for the remaining balance\nunless ChiroDuo, P.L.L.C. explicitly agrees to a reduction in writing.\nI agree to promptly notify said doctor prior to any change or addition of attorney(s) used by me in connection with this\naccident, and I instruct my present attorney to do the same and to promptly deliver a copy of this lien to any such\nsubstituted or added attorney(s). I further acknowledge and agree that this executed lien/assignment shall be binding upon\nany subsequent and/or additional attorney(s) regardless of whether this written document is expressly acknowledged by\nsuch attorney.\nI request that my attorney(s) and any applicable insurance company acknowledge this lien/assignment by signing below\nand returning to the doctor’s office. The undersigned agrees that a copy of this lien may be forwarded to third parties\nresponsible for payment to the patient and that such third parties can act directly in protecting such lien/assignment. Such\ninsurance benefits shall include any coverage provided to the patient(s) for liability, disability, medical payments coverage,\nno-fault, health and accident, workers compensation, and any other applicable benefits. Such insurers are directed and\nauthorized to withhold and reimburse to my doctor such amount as necessary to satisfy the total sum owed by me for\nchiropractic services.\nThis agreement shall be binding upon the patient’s heirs, successors, personal representatives, or assigns.\n\n\n\nI certify that the following person(s) personally appeared before me this day, each acknowledging to me that he or she\nvoluntarily signed the foregoing document for the purpose stated therein and in the capacity indicated."
+      },
+      {
+        "id": "lien_3",
+        "label": "Spanish notice / assignment wording",
+        "required": true,
+        "static_text": "Por la presente autorizo a ChiroDuo, P.L.L.C. a proporcionarle a usted, mi abogado, un informe completo de su examen,\ndiagnóstico, tratamiento, pronóstico, etc., respecto al accidente en el que estuve involucrado recientemente. También\nreconozco que dicho doctor o su(s) representante(s) puede(n) proporcionar consideración adicional a cambio de este\nderecho/asignación de beneficios; incluyendo testimonio en deposición, testimonio en juicio y los informes solicitados.\nPor la presente autorizo y ordeno a usted, mi(s) abogado(s) actual(es) y sucesor(es); junto con cualquier compañía de\nseguros responsable, a pagar directamente a ChiroDuo, P.L.L.C. las sumas totales que se adeudan actualmente y las que\npuedan adeudarse en el futuro por todos los servicios quiroprácticos y relacionados prestados a mí debido a este\naccidente. Dichas sumas se deben a su oficina, y se retendrán de cualquier acuerdo, juicio, orden judicial o veredicto,\nsegún sea necesario para proteger adecuadamente y compensar por completo a dicho doctor por tales sumas totales.\nPor la presente otorgo y asigno un derecho de retención o asignación de beneficios a un tercero de acuerdo con el\nEstatuto General de Carolina del Norte, Capítulo 44-Liens, Artículo 9, Gravámenes sobre recuperaciones por lesiones\npersonales para asegurar sumas adeudadas por atención médica, etc. de mis beneficios/reclamación en mi caso pendiente\na dicho doctor contra cualquier beneficio de seguro y los ingresos de mi acuerdo, juicio, orden judicial o veredicto que\npuedan pagarse a usted, mi abogado, y/o a mí como resultado de las lesiones por las cuales he sido o seré tratado desde\nla perspectiva de la atención quiropráctica en relación con dicho accidente.\n\nResponsabilidad Financiera del Paciente: En el caso de que mi(s) abogado(s) o compañía de seguros no satisfagan por\ncompleto el monto total adeudado a ChiroDuo, P.L.L.C., entiendo y acepto que sigo siendo personalmente y totalmente\nresponsable de cualquier saldo pendiente. Esto incluye pero no se limita a copagos, deducibles y cualquier cantidad no\npagada debido a reducciones de mi abogado, compañía de seguros u otra tercera parte.\nEntiendo completamente que soy directa y totalmente responsable ante dicho doctor por todas las facturas quiroprácticas\npresentadas por los productos y servicios que me brindaron. Este acuerdo se realiza para la protección adicional de dicho\ndoctor y en consideración de su pago pendiente y otros servicios proporcionados por él. Además, entiendo que dicho\npago no está supeditado a ningún acuerdo, juicio, orden judicial o veredicto por el cual eventualmente pueda recuperar\ndicha tarifa, y que mi doctor puede tomar medidas oportunas para hacer cumplir el pago en mi contra por todas las facturas\nquiroprácticas pendientes.\n\nCláusula de Reducción de Pagos por Parte del Abogado/Seguro: En el caso de que mi(s) abogado(s) o la compañía de\nseguros ofrezcan o acepten reducir el pago a ChiroDuo, P.L.L.C. como parte de un acuerdo negociado, seguiré siendo\ntotalmente responsable del saldo restante a menos que ChiroDuo, P.L.L.C. acepte explícitamente una reducción por\nescrito.\nAcepto notificar de inmediato a dicho doctor antes de cualquier cambio o adición de abogado(s) utilizado(s) en relación con\neste accidente, e instruyo a mi abogado actual para que haga lo mismo y entregue de inmediato una copia de este\nderecho de retención a cualquier abogado sustituido o agregado. Además, reconozco y acepto que este derecho de\nretención/asignación ejecutado será vinculante para cualquier abogado posterior y/o adicional, independientemente de si\ndicho abogado reconoce expresamente este documento por escrito.\nSolicito que mi(s) abogado(s) y cualquier compañía de seguros aplicable reconozcan este derecho de retención/asignación\nfirmando a continuación y devolviéndolo a la oficina del doctor. El abajo firmante acepta que se puede enviar una copia de\neste derecho de retención a terceros responsables del pago al paciente, y que dichos terceros pueden actuar\ndirectamente para proteger dicho derecho de retención/asignación. Dichos beneficios de seguro incluirán cualquier\ncobertura brindada al paciente por responsabilidad, discapacidad, cobertura de pagos médicos, sin culpa, salud y\naccidentes, compensación laboral y cualquier otro beneficio aplicable. Dichas aseguradoras están dirigidas y autorizadas a\nretener y reembolsar a mi doctor la cantidad necesaria para satisfacer la suma total que adeudo por los servicios\nquiroprácticos.\nEste acuerdo será vinculante para los herederos, sucesores, representantes personales o cesionarios del paciente.\nCertifico que la(s) siguiente(s) persona(s) comparecieron personalmente ante mí este día, reconociendo cada uno de ellos\nque firmó voluntariamente el documento anterior para el propósito indicado en el mismo y en la capacidad señalada."
+      },
+      {
+        "id": "lien_4",
+        "label": "Signature and acknowledgment status",
+        "required": true,
+        "static_text": "UNSIGNED FORM. This application has not executed or verified any patient, attorney, insurance, witness or notarial signature or acknowledgment. Complete the required execution process separately."
       }
     ]
   }

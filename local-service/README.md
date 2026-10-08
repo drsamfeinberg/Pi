@@ -1,3 +1,5 @@
+The current shared case application is described in [WORKSPACE_README.md](WORKSPACE_README.md). That application can test login, saved cases, the imported clinic template and review without model installation. This README describes the earlier separate AI service; do not run both on port 8765 simultaneously.
+
 # Pi local service for Mac
 
 Whisper (through faster-whisper) transcribes recordings and Ollama drafts reports using templates and source excerpts. Both run locally. No paid API or Apple developer subscription is needed.

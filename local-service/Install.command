@@ -16,5 +16,5 @@ for attempt in {1..30}; do
 done
 ollama pull qwen3:4b
 .venv/bin/python -c 'from faster_whisper import WhisperModel; WhisperModel("small", device="cpu", compute_type="int8")'
-echo 'Models installed. Double-click Start.command and paste its pairing code into Pi.'
+echo 'Models installed. Run bash Start.command in Terminal and paste its pairing code into Pi.'
 read -r -p 'Press Return to close.'

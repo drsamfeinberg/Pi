@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Pi \u2014 Jane Draft Bridge",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Upload documents, assemble and review report drafts, then map sections to empty Jane fields. Local prototype.",
   "permissions": [
     "activeTab",
@@ -28,5 +28,8 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; worker-src 'self'"
-  }
+  },
+  "optional_host_permissions": [
+    "https://*/*"
+  ]
 }

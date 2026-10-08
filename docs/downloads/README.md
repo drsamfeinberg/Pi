@@ -1,8 +1,7 @@
-# Pi Mac prototype downloads
+# Pi prototype downloads
 
-- [Chrome extension ZIP](pi-chrome-web-store-review.zip), version 0.2.0: direct document intake, local transcription/drafting connection, review and Jane field mapping.
-- [Local Mac service ZIP](Pi-Local-Service-Mac.zip): installer, startup script, local Whisper/Ollama service and instructions.
+- [Shared case workspace for Mac](Pi-Shared-Workspace-Mac.zip): saved cases, individual worker/clinician logins, clinic chart template, review and direct Jane handoff. Read its WORKSPACE_README.md. Start via Python in Terminal; no `.command` launcher is needed. A fictional workflow test needs only Python 3.
+- [Chrome extension ZIP](pi-chrome-web-store-review.zip), version 0.3.0: shared-case bridge plus the earlier document workspace. Replace the existing extension folder contents and Reload, or Load unpacked on its root manifest.json folder.
+- [Earlier local Mac service ZIP](Pi-Local-Service-Mac.zip): separate transcription/drafting service. Stop it before starting the shared workspace on the same port. It is not the shared case application.
 
-Unzip the extension and select its folder containing `manifest.json` in Chrome's Load unpacked dialog. Update an existing installation by replacing its folder contents and clicking Reload. The local service is installed separately using its included README. No DMG or Apple developer subscription is required.
-
-No patient records or credentials are included. The packages are prototypes: Mac installation, full model inference and live Jane editor compatibility still need validation. The extension has not been approved by the Chrome Web Store. Companion SHA-256 files record the downloads' checksums.
+The shared workspace package includes code and the section names of the uploaded clinic template. No source patient files, identifiers, case databases, passwords or default clinical findings are bundled. Full Mac inference, private remote access and live Jane field compatibility need testing. The first fictional workflow test does not use AI. The extension has not been approved by the Chrome Web Store. Companion SHA-256 files record package checksums.
