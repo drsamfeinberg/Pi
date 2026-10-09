@@ -10,8 +10,12 @@ import secrets
 import sqlite3
 import threading
 import time
+import subprocess
+import sys
+import tempfile
 from urllib.parse import urlsplit
 import pi_service as ai
+import visual_extract
 
 ASSETS = Path(__file__).parent/'workspace'
 TEMPLATES = json.loads((ASSETS/'templates.json').read_text())
@@ -19,9 +23,39 @@ DB = None
 PUBLIC = os.environ.get('PI_PUBLIC_ORIGIN', '').rstrip('/')
 SESSIONS = {}
 JOBS = {}
+CONTROLS = {}
 LOCK = threading.RLock()
 BUSY = threading.Lock()
 FAILURES = {}
+
+
+def audio_task(audio, suffix, progress, control):
+    if suffix not in ['.mp3','.m4a','.wav','.mp4','.webm','.aac','.ogg']: raise ValueError('Unsupported audio format.')
+    with tempfile.TemporaryDirectory(prefix='pi-audio-') as folder:
+        path=Path(folder)/('recording'+suffix)
+        path.write_bytes(audio); path.chmod(0o600)
+        if control['cancel'].is_set(): raise ValueError('Transcription canceled. No transcript was saved.')
+        process=subprocess.Popen([sys.executable,str(Path(__file__).with_name('audio_worker.py')),str(path),suffix],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True,env={**os.environ,'TMPDIR':folder})
+        with LOCK:
+            control['process']=process
+            if control['cancel'].is_set(): process.terminate()
+        result=None
+        try:
+            for line in process.stdout:
+                value=json.loads(line)
+                if 'stage' in value: progress(value['stage'])
+                if 'result' in value: result=value['result']
+                if 'error' in value: raise ValueError(value['error'])
+            process.wait()
+            if control['cancel'].is_set(): raise ValueError('Transcription canceled. No transcript was saved.')
+            if process.returncode or result is None: raise ValueError('Transcription process stopped without a result.')
+            return result
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                try: process.wait(timeout=3)
+                except subprocess.TimeoutExpired: process.kill(); process.wait()
+            process.stdout.close()
 
 def db():
     con = sqlite3.connect(DB, timeout=20)
@@ -210,13 +244,14 @@ class Handler(ai.Handler):
                 try:
                     with ai.urlopen('http://127.0.0.1:11434/api/tags',timeout=3) as r: names=[m['name'] for m in json.load(r).get('models',[])]
                     model_ready=ai.MODEL in names
-                except Exception: model_ready=False
-                self.send(200,{'model':ai.MODEL,'model_ready':model_ready}); return
+                except Exception: model_ready=False; names=[]
+                self.send(200,{'model':ai.MODEL,'model_ready':model_ready,'vision_model':visual_extract.MODEL,'vision_ready':visual_extract.MODEL in names}); return
             if path.startswith('/api/jobs/'):
                 with LOCK:
                     job=JOBS.get(path.split('/')[-1])
                     if not job or job['user']!=user['name']: raise PermissionError('Job unavailable.')
                     result={k:v for k,v in job.items() if k not in ['user','created']}
+                    result['elapsed_seconds']=int(time.time()-job['created'])
                     if job['status'] in ['complete','error']: JOBS.pop(path.split('/')[-1],None)
                 self.send(200,result); return
             match=re.fullmatch(r'/api/cases/([a-f0-9]+)(/approved/([a-z0-9_]+)|/audit)?',path)
@@ -240,13 +275,14 @@ class Handler(ai.Handler):
         if not 0<size<=ai.MAX_BODY: raise ValueError('Upload limit: 100 MB.')
         return self.rfile.read(size)
 
-    def launch(self,user,task):
+    def launch(self,user,task,control=None):
         if not BUSY.acquire(blocking=False): raise ValueError('A local AI job is running. Wait for it to finish.')
         job_id=secrets.token_hex(16)
         with LOCK:
             for key in list(JOBS):
                 if JOBS[key]['status']!='running' and time.time()-JOBS[key]['created']>900: JOBS.pop(key,None)
             JOBS[job_id]={'user':user['name'],'status':'running','stage':'Starting local processing','created':time.time()}
+            if control is not None: CONTROLS[job_id]=control
         def run():
             def progress(stage):
                 with LOCK: JOBS[job_id]['stage']=stage
@@ -256,7 +292,9 @@ class Handler(ai.Handler):
             except Exception as e:
                 error=str(e) if isinstance(e,ValueError) else 'Local processing failed. Check installed models and source format.'
                 with LOCK: JOBS[job_id].update(status='error',error=error)
-            finally: BUSY.release()
+            finally:
+                with LOCK: CONTROLS.pop(job_id,None)
+                BUSY.release()
         try:
             self.send(202,{'job_id':job_id}); threading.Thread(target=run,daemon=True).start()
         except Exception: BUSY.release(); raise
@@ -284,6 +322,16 @@ class Handler(ai.Handler):
                 self.send_header('Set-Cookie',f'pi_session={token}; HttpOnly; SameSite=Strict; Path=/'+('; Secure' if PUBLIC else ''))
                 self.send_header('Content-Type','application/json'); self.send_header('Cache-Control','no-store'); self.send_header('Content-Length',str(len(data))); self.end_headers(); self.wfile.write(data); return
             user=self.user(mutate=True)
+            cancel_match=re.fullmatch(r'/api/jobs/([a-f0-9]+)/cancel',path)
+            if cancel_match:
+                with LOCK:
+                    job=JOBS.get(cancel_match[1]); control=CONTROLS.get(cancel_match[1])
+                    if not job or job['user']!=user['name']: raise PermissionError('Job unavailable.')
+                    if not control: raise ValueError('This job does not support cancellation or has already finished.')
+                    control['cancel'].set(); job['stage']='Stopping transcription'
+                    child_process=control.get('process')
+                    if child_process and child_process.poll() is None: child_process.terminate()
+                self.send(200,{'stopping':True}); return
             if path=='/api/logout':
                 with LOCK:
                     for token,session in list(SESSIONS.items()):
@@ -291,8 +339,15 @@ class Handler(ai.Handler):
                 self.send(200,{'ok':True}); return
             if path=='/api/transcribe':
                 audio=self.body(); suffix=self.headers.get('X-Pi-Audio-Suffix','')
-                self.launch(user,lambda progress:ai.transcribe(audio,suffix)); return
+                control={'cancel':threading.Event()}
+                self.launch(user,lambda progress:audio_task(audio,suffix,progress,control),control); return
             body=json.loads(self.body())
+            if path=='/api/visual-extract':
+                def read_page(progress):
+                    progress('Reading printed text, handwriting, checkboxes and diagram marks locally')
+                    ai.WHISPER=None; ai.gc.collect(); ai.unload_ollama()
+                    return visual_extract.extract(body)
+                self.launch(user,read_page); return
             if path=='/api/users':
                 if user['role']!='clinician': raise PermissionError('Clinician access required.')
                 create_user(body.get('name',''),body.get('password',''),'worker'); self.send(201,{'ok':True}); return

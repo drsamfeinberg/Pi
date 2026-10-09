@@ -66,6 +66,26 @@ class WorkspaceTests(unittest.TestCase):
   with self.assertRaises(HTTPError) as error:
    self.api('/cases/'+case['id']+'/source_selection',{'version':case['version'],'source_id':case['sources'][0]['id'],'included':True},worker)
   self.assertEqual(error.exception.code,409)
+ def test_audio_cancellation_stops_child_and_releases_local_job(self):
+  worker=self.login('worker');other=self.api('/login',{'name':'otherworker','password':'other-password-long'})['session'];original=app.subprocess.Popen;children=[]
+  def slow_worker(*args,**kwargs):
+   child=original([app.sys.executable,'-u','-c','import time,json; print(json.dumps({"stage":"Fictional transcription running"}),flush=True); time.sleep(30)'],**kwargs)
+   children.append(child);return child
+  with patch.object(app.subprocess,'Popen',side_effect=slow_worker):
+   request=Request(self.base+'/api/transcribe',data=b'fictional audio',headers={'X-Pi-Session':worker,'X-Pi-Audio-Suffix':'.m4a','Content-Type':'application/octet-stream'})
+   with urlopen(request) as response:job=json.load(response)['job_id']
+   for _ in range(100):
+    if children:break
+    time.sleep(.01)
+   with self.assertRaises(HTTPError) as error:self.api('/jobs/'+job+'/cancel',{},other)
+   self.assertEqual(error.exception.code,403)
+   self.api('/jobs/'+job+'/cancel',{},worker)
+   for _ in range(100):
+    if not app.BUSY.locked():break
+    time.sleep(.01)
+   self.assertFalse(app.BUSY.locked());self.assertIsNotNone(children[0].poll())
+   value=self.api('/jobs/'+job,session=worker)
+   self.assertEqual(value['status'],'error');self.assertIn('canceled',value['error'])
  def test_unsigned_sources_cannot_supply_approved_report_and_normal_web_origins_rejected(self):
   with self.assertRaises(HTTPError):self.api('/cases')
   with self.assertRaises(HTTPError):self.api('/login',{'name':'worker','password':self.passwords['worker']},origin='https://attacker.example')
