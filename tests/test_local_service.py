@@ -48,6 +48,33 @@ class EvidenceTests(unittest.TestCase):
             packet = service.draft(case())
         self.assertEqual(packet['report']['fields']['soap_1']['text'], '')
 
+    def test_cross_date_history_and_partial_evidence_are_requested(self):
+        payload = case()
+        payload['sources'][0]['pages'][0] = 'Intake dated 2025-12-01: Patient reports neck discomfort.'
+        with patch.object(service, 'chat', return_value=response()) as model:
+            packet = service.draft(payload)
+        prompt = model.call_args_list[0].args[0]
+        self.assertIn('Use partial evidence', prompt)
+        self.assertIn('2025-12-01', prompt)
+        self.assertIn('target_report_date', prompt)
+        self.assertIn('Subjective', prompt)
+        self.assertIn('neck discomfort', packet['report']['fields']['soap_1']['text'])
+
+    def test_large_template_extracts_small_labeled_batches(self):
+        payload = case()
+        payload['template']['fields'] = [{'id': 'field_'+str(i), 'label': 'Clinical section '+str(i)} for i in range(13)]
+        def empty_model(prompt, schema):
+            ids = list(schema['properties']['fields']['properties'])
+            self.assertLessEqual(len(ids), 6)
+            for field in ids:
+                label = next(f['label'] for f in payload['template']['fields'] if f['id'] == field)
+                self.assertIn(label, prompt)
+            return {'fields': {i: {'text': '', 'citations': []} for i in ids}}
+        with patch.object(service, 'chat', side_effect=empty_model) as model:
+            packet = service.draft(payload)
+        self.assertEqual(model.call_count, 3)
+        self.assertEqual(len(packet['report']['fields']), 13)
+
     def test_uncited_generated_text_is_discarded(self):
         bad = {'fields': {'soap_1': {'text': 'Unsupported finding', 'citations': []}}}
         with patch.object(service, 'chat', side_effect=[response(), bad]):
