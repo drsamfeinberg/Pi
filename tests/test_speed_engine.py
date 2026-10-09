@@ -41,7 +41,7 @@ class SpeedTests(unittest.TestCase):
             if 'Source passages:\n' in prompt:seen.extend(json.loads(prompt.split('Source passages:\n')[1]))
             return self.model(prompt,schema)
         with patch.object(s,'chat',side_effect=model) as calls:
-            packet=s.draft(payload)
+            packet=s.draft_v2(payload)
         for page,original in enumerate(payload['sources'][0]['pages'],1):
             self.assertEqual(''.join(p['quote'] for p in seen if p['page']==page),original)
         metrics=packet['generation']
@@ -65,7 +65,7 @@ class SpeedTests(unittest.TestCase):
             s.draft_legacy(payload)
         payload['_evidence_cache']={}
         with patch.object(s,'chat',side_effect=self.model) as new:
-            packet=s.draft(payload)
+            packet=s.draft_v2(payload)
         self.assertEqual(old.call_count,71)
         self.assertEqual(new.call_count,packet['generation']['source_chunks']+6)
         self.assertLessEqual(new.call_count,15)
@@ -78,7 +78,7 @@ class SpeedTests(unittest.TestCase):
             answer=self.model(data['messages'][1]['content'],data['format'])
             return io.BytesIO(json.dumps({'message':{'content':json.dumps(answer)},'done_reason':'stop'}).encode())
         with patch.object(s,'urlopen',side_effect=ollama):
-            packet=s.draft(fixture())
+            packet=s.draft_v2(fixture())
         self.assertEqual(len(requests),packet['generation']['mapping_requests']+packet['generation']['drafting_requests'])
         self.assertTrue(all(f['text'] for f in packet['report']['fields'].values()))
         self.assertTrue(all(r['think'] is False for r in requests))
@@ -86,13 +86,13 @@ class SpeedTests(unittest.TestCase):
     def test_repeat_reuses_mapping_and_changed_source_or_model_invalidates_it(self):
         payload=fixture()
         with patch.object(s,'chat',side_effect=self.model):
-            first=s.draft(payload);repeat=s.draft(payload)
+            first=s.draft_v2(payload);repeat=s.draft_v2(payload)
             self.assertEqual(repeat['generation']['mapping_requests'],0)
             self.assertEqual(repeat['generation']['cached_mapping_chunks'],first['generation']['source_chunks'])
             payload['sources'][0]['pages'][0]='Changed clinician note. '+payload['sources'][0]['pages'][0]
-            self.assertGreater(s.draft(payload)['generation']['mapping_requests'],0)
+            self.assertGreater(s.draft_v2(payload)['generation']['mapping_requests'],0)
             with patch.object(s,'MODEL','different-local-model'):
-                self.assertEqual(s.draft(payload)['generation']['cached_mapping_chunks'],0)
+                self.assertEqual(s.draft_v2(payload)['generation']['cached_mapping_chunks'],0)
 
     def test_mapper_cannot_supply_invented_quote_or_unknown_passage(self):
         payload=fixture()
@@ -100,7 +100,7 @@ class SpeedTests(unittest.TestCase):
             return {'fields':{key:{'evidence_ids':['invented'],'citations':[{'source_id':'fixture','page':1,'quote':'Invented fracture.'}]}
                               for key in schema['properties']['fields']['properties']}}
         with patch.object(s,'chat',side_effect=forged) as calls:
-            packet=s.draft(payload)
+            packet=s.draft_v2(payload)
         self.assertEqual(calls.call_count,packet['generation']['source_chunks'])
         self.assertTrue(all(not f['text'] and not f['citations'] for f in packet['report']['fields'].values()))
 
@@ -114,12 +114,12 @@ class SpeedTests(unittest.TestCase):
             return {'fields':{fields[0]:{'text':'Pain {{N3}}.','has_support':True,'evidence_ids':['E1']},
                               fields[1]:{'text':'','has_support':False,'evidence_ids':[]}}}
         with patch.object(s,'chat',side_effect=model):
-            with self.assertRaisesRegex(ValueError,'uncited'):s.draft(payload)
+            with self.assertRaisesRegex(ValueError,'uncited'):s.draft_v2(payload)
 
     def test_empty_sections_have_valid_schema_and_no_synthesis_request(self):
         payload=fixture()
         def empty(prompt,schema):return {'fields':{key:{'evidence_ids':[]} for key in schema['properties']['fields']['properties']}}
-        with patch.object(s,'chat',side_effect=empty):packet=s.draft(payload)
+        with patch.object(s,'chat',side_effect=empty):packet=s.draft_v2(payload)
         self.assertEqual(packet['generation']['drafting_requests'],0)
         schema=s.section_schema(payload['template']['fields'][0],[])
         definition=schema['properties']['fields']['properties']['clinic_0']['properties']['evidence_ids']

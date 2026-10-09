@@ -281,7 +281,7 @@ def source_passages(sources):
                 if quote.strip():
                     passages.append({'evidence_id':'P'+str(len(passages)+1),'source_id':source['id'],
                                      'source_name':source['name'],'page':page,'kind':source.get('kind','clinical'),
-                                     'line':'excerpt','quote':quote})
+                                     'line':'excerpt','quote':quote,'start':start,'end':end})
                 start=end
     return passages
 
@@ -293,7 +293,7 @@ def mapping_schema(fields, references):
             'required':[f['id'] for f in fields],'additionalProperties':False}},'required':['fields'],'additionalProperties':False}
 
 
-def draft(payload, progress=lambda stage: None):
+def draft_v2(payload, progress=lambda stage: None):
     """Map passage IDs once per chunk, then draft bounded groups of sections."""
     global WHISPER
     WHISPER=None;gc.collect()
@@ -335,6 +335,171 @@ def draft(payload, progress=lambda stage: None):
     packet['generation'].update({'engine_version':'passage_ids_v2','mapping_requests':mapping_calls,
         'cached_mapping_chunks':hits,'source_chunks':len(chunks),'elapsed_seconds':round(time.monotonic()-started,1)})
     packet['report']['performance']={k:v for k,v in packet['generation'].items() if k not in ('notice','model','engine')}
+    return packet
+
+
+# Local retrieval finds candidate passages, not clinical conclusions. The model still
+# verifies relevance/support while drafting; originals and unassigned passages remain available.
+SOAP_SEARCH = {
+ 'jane_soap_01': r'complaint|symptom|reports?|pain|discomfort|stiff|tingling|numb|dressing|driving|childcare|work tolerance',
+ 'jane_soap_02': r'range of motion|\bROM\b|palpat|spasm|hyperton|segmental|neurolog|reflex|motor testing|strength|rotation|extension|flexion|dermatom',
+ 'jane_soap_03': r'adjustment|manipulat|restricted segment|fixation',
+ 'jane_soap_04': r'manual therapy|myofascial|mobilization|exercise|neuromuscular|97140|97110|97112',
+ 'jane_soap_05': r'patient response|tolerat|following treatment|after treatment|immediate response|motor|reflex|palpat|range of motion',
+ 'jane_soap_06': r'diagnos|sprain|strain|cervicalgia|\bICD|\b[MSRV][0-9]{2}\.',
+ 'jane_soap_07': r'follow.up|interval|improv|worsen|unchanged|persist|since|returned|missed|attendance',
+ 'jane_soap_08': r'progress|improv|worsen|unchanged|expected|plateau|recover|missed|attendance',
+ 'jane_soap_09': r'efficien|carry.over|response|benefit|improv|treatment tolerance|between visits',
+ 'jane_soap_10': r'prognosis|prognostic|recovery depends|favorable|barriers|good prognosis',
+ 'jane_soap_11': r'treatment|therapy|myofascial|manipulat|adjustment|exercise|neuromuscular',
+ 'jane_soap_12': r'visits? per|visits?.{0,25}week|times.{0,20}week|frequency|duration|weeks?|months?|treatment schedule',
+ 'jane_soap_13': r'technique|adjustment|manipulat|force selection|end.range loading|diversified|activator|drop.table',
+ 'jane_soap_14': r'goals?|restore|restoration|functional recovery|return to normal',
+ 'jane_soap_15': r'home|self.care|stretch|pillow|exercise|ergonomic|warm shower|ice|heat',
+ 'jane_soap_16': r'recommend|referr|ordered|MRI|consult|brace|pillow|imaging|follow.up',
+ 'jane_soap_17': r'\bCPT\b|\b97[0-9]{3}\b|\b9894[0-3]\b|medically necessary|medical necessity|rationale',
+ 'soap_1': r'patient|reports?|symptom|complaint|pain|discomfort|history',
+ 'soap_2': r'exam|range of motion|palpat|reflex|motor|strength|imaging|radiolog|MRI|\bROM\b',
+ 'soap_3': r'diagnos|assessment|prognosis|clinical impression|sprain|strain',
+ 'soap_4': r'plan|recommend|ordered|referr|treatment|therapy|exercise|follow.up'
+}
+
+
+CLINIC_HEADING_ROUTES={
+ 'history of condition injury as described by the patient':['jane_soap_01'],
+ 'initial outcome assessments':['jane_soap_02'],
+ 'headache disability index hdi':['jane_soap_02'],
+ 'neck disability index ndi':['jane_soap_02'],
+ 'upper extremity functional scale':['jane_soap_02'],
+ 'your initial diagnosis of the patient working diagnosis':['jane_soap_06'],
+ 'has the patient ever had the same or similar condition':['jane_soap_01'],
+ 'have you ever treated the patient prior to this accident':['jane_soap_01'],
+ 'please state your professional opinion':['jane_soap_06'],
+ 'is the current condition solely a result of this accident':['jane_soap_06'],
+ 'injuries affecting work responsibilities':['jane_soap_01'],
+ 'are current injuries preventing the patient from performing their job duties':['jane_soap_01'],
+ 'mechanism of the patient s injuries':['jane_soap_01'],
+ 'please describe the prognosis of the patient s condition':['jane_soap_10'],
+ 'initial objective findings':['jane_soap_02'],
+ 'treatment plan':['jane_soap_11','jane_soap_12','jane_soap_13','jane_soap_15','jane_soap_16'],
+ 'statement of medical necessity and treatment options':['jane_soap_17'],
+ 'goals of care':['jane_soap_14'],
+ 'treatment details':['jane_soap_12','jane_soap_16'],
+}
+
+
+def heading_regions(fields,sources):
+    normalize=lambda text:re.sub(r'[^a-z0-9]+',' ',text.lower()).strip()
+    headings=dict(CLINIC_HEADING_ROUTES) if any(f['id'].startswith('jane_soap_') for f in fields) else {}
+    for f in fields:
+        for label in [f['label']]+f.get('aliases',[]):headings[normalize(label)]=[f['id']]
+    output=[]
+    for source in sources:
+        active=None
+        for page,text in enumerate(source['pages'],1):
+            start=0
+            for line in text.splitlines(keepends=True):
+                prefix,colon,_=line.partition(':')
+                label=normalize(prefix if colon else line)
+                route=headings.get(label)
+                if route is not None:
+                    active=route
+                output.append((source['id'],page,start,start+len(line),active))
+                start+=len(line)
+    return output
+
+
+def route_local_evidence(fields,sources):
+    passages=source_passages(sources)
+    regions=heading_regions(fields,sources)
+    evidence={f['id']:[] for f in fields};unassigned=[]
+    dates={}
+    date_pattern=r'\b(?:20[0-9]{2}[-/][0-9]{1,2}[-/][0-9]{1,2}|(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+[0-9]{1,2},?\s+20[0-9]{2})\b'
+    for passage in passages:
+        for match in re.finditer(date_pattern,passage['quote'],re.I):
+            anchor={**passage,'quote':passage['quote'][max(0,match.start()-48):min(len(passage['quote']),match.end()+48)]}
+            if anchor not in dates.setdefault(passage['source_id'],[]):dates[passage['source_id']].append(anchor)
+    for passage in passages:
+        key=(passage['source_id'],passage['page']);offset=passage['start']
+        routes={field for sid,page,start,end,route in regions if sid==key[0] and page==key[1] and start<offset+len(passage['quote']) and end>offset and route is not None for field in route}
+        routed=any(sid==key[0] and page==key[1] and start<offset+len(passage['quote']) and end>offset and route is not None for sid,page,start,end,route in regions)
+        assigned=False
+        for f in fields:
+            pattern=SOAP_SEARCH.get(f['id'])
+            if not pattern:
+                words=[w for w in re.findall(r'[a-z]{3,}',f['label'].lower()) if w not in ('and','the','summary','notes','explanation','recommendations','findings')]
+                pattern='|'.join(re.escape(w) for w in words) if words else r'(?!)'
+            matches=f['id'] in routes if routed else bool(re.search(pattern,passage['quote'],re.I))
+            if matches:
+                # Non-clinical source types only supply their stated category of evidence.
+                if passage['kind']=='police' and f['id'] in SOAP_SEARCH and f['id'] not in ('jane_soap_01','soap_1'):continue
+                selected=checked_citations([passage],sources)
+                if selected:evidence[f['id']].extend(selected);assigned=True
+        if not assigned:unassigned.append(passage)
+    # Supply explicitly quoted source dates for attribution; no date is inferred from a filename.
+    for f in fields:
+        source_ids={c['source_id'] for c in evidence[f['id']]}
+        for source_id in source_ids:
+            for anchor in dates.get(source_id,[]):
+                for c in checked_citations([anchor],sources):
+                    if c not in evidence[f['id']]:evidence[f['id']].append(c)
+    return evidence,unassigned,len(passages)
+
+
+def draft(payload,progress=lambda stage:None):
+    global WHISPER
+    WHISPER=None;gc.collect();started=time.monotonic()
+    fields,sources=validate_payload(payload)
+    progress('Finding candidate source passages locally — no model mapping requests')
+    evidence,unassigned,count=route_local_evidence(fields,sources)
+    context={'case_label':payload['case_label'],'target_report_date':payload['encounter'],
+             'source_date_policy':'Use relevant case records across dates; attribute historical findings.',
+             'template':{k:v for k,v in payload['template'].items() if k!='fields'},
+             'writing_guidance':writing_guidance(payload['template']['id']),
+             'retrieval_policy':'Excerpts are lexical candidates, NOT a determination of section support. Date context may include unrelated findings. Verify actual support separately for every section. Do not repeat irrelevant information.'}
+    packet=synthesize_complete_fields(payload,fields,evidence,context,progress)
+    metrics={'engine_version':'local_retrieval_v3','mapping_requests':0,'cached_mapping_chunks':0,
+             'source_passages':count,'unassigned_passages':len(unassigned),
+             'elapsed_seconds':round(time.monotonic()-started,1)}
+    packet['generation'].update(metrics)
+    packet['report']['performance']={**metrics,'drafting_requests':packet['generation']['drafting_requests']}
+    packet['report']['retrieval_review']={'method':'lexical_candidates','unassigned':unassigned,
+        'notice':'Local retrieval may miss relevant facts or include irrelevant passages. Unassigned passages remain visible for review; a populated section does not establish complete coverage.'}
+    return packet
+
+
+
+def synthesize_complete_fields(payload,fields,evidence,context,progress):
+    expanded=[];pieces={};parents={}
+    for field in fields:
+        groups=[];group=[];size=0
+        for citation in evidence[field['id']]:
+            if group and size+len(citation['quote'])>6500:
+                groups.append(group);group=[];size=0
+            group.append(citation);size+=len(citation['quote'])
+        if group or not groups:groups.append(group)
+        parents[field['id']]=[]
+        for i,group in enumerate(groups):
+            key=field['id'] if len(groups)==1 else field['id']+'_part_'+str(i+1)
+            expanded.append({**field,'id':key,'label':field['label']+(f' — source part {i+1} of {len(groups)}' if len(groups)>1 else '')})
+            pieces[key]=group;parents[field['id']].append(key)
+    packet=synthesize_fields(payload,expanded,pieces,{**context,'continuation_policy':'For split sections, draft only facts in this source part. Do not claim the whole section or record is complete. Other parts will be retained separately.'},progress,batch_size=3)
+    assembled={};split=[]
+    for field in fields:
+        parts=[packet['report']['fields'][key] for key in parents[field['id']]]
+        value=dict(parts[0])
+        if len(parts)>1:
+            split.append({'field_id':field['id'],'parts':len(parts)})
+            value['text']='\n\n'.join(part['text'] for part in parts if part['text'])
+            value['citations']=[]
+            for part in parts:
+                for citation in part['citations']:
+                    if citation not in value['citations']:value['citations'].append(citation)
+            value['evidence_status']='partial_draft' if any(not part['text'] for part in parts) else 'supported'
+            value['review_question']='Review all source parts and reconcile overlapping or differing findings before approval.'
+        assembled[field['id']]=value
+    packet['report']['fields']=assembled
+    packet['report']['split_sections']=split
     return packet
 
 
