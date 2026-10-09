@@ -65,6 +65,9 @@ def parse_model_output(output, schema):
             raise ValueError('required section is missing or not an object')
         if 'text' in definition.get('required', []) and not isinstance(value.get('text'), str):
             raise ValueError('section text is missing or not text')
+        pattern=definition.get('properties',{}).get('text',{}).get('pattern')
+        if pattern and not re.fullmatch(pattern,value['text']):
+            raise ValueError('section numeric values bypassed protected source tokens')
         if 'citations' in definition.get('required', []) and not isinstance(value.get('citations'), list):
             raise ValueError('section citations are missing or not an array')
         if 'evidence_ids' in definition.get('required', []):
@@ -127,13 +130,41 @@ def output_schema(fields, evidence_only=False):
     return {'type': 'object', 'properties': {'fields': {'type': 'object', 'properties': {f['id']: value for f in fields}, 'required': [f['id'] for f in fields], 'additionalProperties': False}}, 'required': ['fields'], 'additionalProperties': False}
 
 
-def section_schema(field, references):
+def section_schema(field, references, numeric_tokens=None):
+    alternatives = '|'.join(re.escape(key) for key in (numeric_tokens or {}))
+    pattern = '^(?:[^0-9{}]' + ('|'+alternatives if alternatives else '') + ')*$'
     value = {'type':'object', 'properties': {
-        'text': {'type':'string'}, 'has_support': {'type':'boolean'},
+        'text': {'type':'string','pattern':pattern}, 'has_support': {'type':'boolean'},
         'evidence_ids': {'type':'array','items':{'type':'string','enum':references}}},
         'required':['text','has_support','evidence_ids'], 'additionalProperties':False}
     return {'type':'object','properties':{'fields':{'type':'object','properties':{field['id']:value},
             'required':[field['id']],'additionalProperties':False}},'required':['fields'],'additionalProperties':False}
+
+
+def protect_numeric_values(indexed):
+    tokens={}
+    protected=[]
+    for excerpt in indexed:
+        def substitute(match):
+            key='{{N'+str(len(tokens)+1)+'}}'
+            tokens[key]={'value':match.group(), 'evidence_id':excerpt['evidence_id']}
+            return key
+        quote=re.sub(r'\b[0-9]+(?:[./:%-][0-9]+)*(?:%|\b)',substitute,excerpt['quote'])
+        protected.append({**excerpt,'quote':quote})
+    return protected,tokens
+
+
+def restore_numeric_values(text, tokens, cited_ids):
+    # Never accept a new literal number or fix a malformed clinical value by guesswork.
+    without_tokens=re.sub(r'\{\{N[0-9]+\}\}', '', text)
+    if re.search(r'[0-9{}]',without_tokens):
+        raise ValueError('Draft introduced an unprotected numeric value; no section was accepted.')
+    def substitute(match):
+        token=tokens.get(match.group())
+        if token is None or token['evidence_id'] not in cited_ids:
+            raise ValueError('Draft used an unknown or uncited numeric source token.')
+        return token['value']
+    return re.sub(r'\{\{N[0-9]+\}\}',substitute,text)
 
 
 def validate_payload(payload):
@@ -230,13 +261,14 @@ def draft(payload, progress=lambda stage: None):
         if excerpts:
             references = {f'E{index+1}': citation for index, citation in enumerate(excerpts)}
             indexed = [{'evidence_id': key, **citation} for key, citation in references.items()]
-            answer = chat('Draft this report section using ONLY the verified excerpts below. Cite the evidence IDs used in evidence_ids; DO NOT retype source quotations. Set has_support true only if the excerpts document this section. Subjective symptom history does not support Objective, Assessment or Plan. For Plan require a documented clinician decision, treatment recommendation or follow-up instruction; do not fill Plan with complaints or statements that no plan exists. If support is absent, return has_support false, empty text and empty evidence_ids. Do not output date placeholders. State documented discrepancies explicitly. Use relevant historical excerpts across dates with attribution. Context:\n'+json.dumps(context)+'\nSection:\n'+json.dumps(f)+'\nVerified source DATA:\n'+json.dumps(indexed), section_schema(f,list(references)))
+            indexed,numeric_tokens=protect_numeric_values(indexed)
+            answer = chat('Draft this report section using ONLY the verified excerpts below. Cite the evidence IDs used in evidence_ids; DO NOT retype source quotations. Numeric facts in the excerpts are replaced by protected tokens such as {{N1}}. Copy those tokens unchanged into your text where the value belongs; the server restores the actual value. Never invent or spell out the numeric value behind the token and do not type any literal digits in report text. Use only tokens from cited evidence. The target report date is metadata, not a numeric fact to copy into section prose. Set has_support true only if the excerpts document this section. Subjective symptom history does not support Objective, Assessment or Plan. For Plan require a documented clinician decision, treatment recommendation or follow-up instruction; do not fill Plan with complaints or statements that no plan exists. If support is absent, return has_support false, empty text and empty evidence_ids. Do not output date placeholders. State documented discrepancies explicitly. Use relevant historical excerpts across dates with attribution. Context:\n'+json.dumps(context)+'\nSection:\n'+json.dumps(f)+'\nVerified source DATA:\n'+json.dumps(indexed), section_schema(f,list(references),numeric_tokens))
             value = answer.get('fields', {}).get(f['id'], {})
             ids = value.get('evidence_ids', [])
             if isinstance(ids,list):
                 citations = [references[key] for key in dict.fromkeys(key for key in ids if isinstance(key,str)) if key in references]
             if value.get('has_support') is True and isinstance(value.get('text'), str) and len(value['text']) <= 30000 and citations:
-                text = value['text']
+                text = restore_numeric_values(value['text'],numeric_tokens,ids)
         status = 'supported' if text else ('draft_not_verified' if excerpts else 'no_verified_excerpts')
         result[f['id']] = {'text': text, 'citations': citations, 'candidates': [], 'conflict': False, 'resolved': False, 'edited': False,
                           'evidence_status': status,

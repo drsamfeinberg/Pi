@@ -45,7 +45,7 @@ class EvidenceTests(unittest.TestCase):
         payload=case();quote='Patient reports neck discomfort rated 7/10.'
         payload['sources'][0]['pages']=[quote]
         extraction=response(quote)
-        synthesis={'fields':{'soap_1':{'text':'Patient reports neck discomfort rated 7/10.',
+        synthesis={'fields':{'soap_1':{'text':'Patient reports neck discomfort rated {{N1}}.',
                                       'has_support':True,'evidence_ids':['E1'],
                                       'citations':[{'source_id':'s1','page':1,'quote':'Patient reports neck discomfort rated 7/1:10.'}]}}}
         with patch.object(service,'chat',side_effect=[extraction,synthesis]) as model:
@@ -62,6 +62,27 @@ class EvidenceTests(unittest.TestCase):
         with patch.object(service,'chat',side_effect=[extraction,synthesis]):
             value=service.draft(payload)['report']['fields']['soap_4']
         self.assertEqual(value['text'],'')
+
+    def test_protected_numeric_values_restore_exact_rating_dose_and_date(self):
+        source=[{'evidence_id':'E1','quote':'Pain 7/10. Dose 2.5 mg on 2026-01-15.'}]
+        protected,tokens=service.protect_numeric_values(source)
+        self.assertEqual(protected[0]['quote'],'Pain {{N1}}. Dose {{N2}} mg on {{N3}}.')
+        text=service.restore_numeric_values('Pain {{N1}}; dose {{N2}} mg on {{N3}}.',tokens,['E1'])
+        self.assertEqual(text,'Pain 7/10; dose 2.5 mg on 2026-01-15.')
+        with self.assertRaisesRegex(ValueError,'unprotected'):
+            service.restore_numeric_values('Pain 7/1:10.',tokens,['E1'])
+        with self.assertRaisesRegex(ValueError,'uncited'):
+            service.restore_numeric_values('Pain {{N1}}.',tokens,[])
+        with self.assertRaisesRegex(ValueError,'unknown'):
+            service.restore_numeric_values('Pain {{N99}}.',tokens,['E1'])
+
+    def test_numeric_schema_rejects_the_observed_model_corruption(self):
+        fields=case()['template']['fields'];schema=service.section_schema(fields[0],['E1'],{'{{N1}}':{'value':'7/10','evidence_id':'E1'}})
+        answer={'fields':{'soap_1':{'text':'Pain 7/1:10.','has_support':True,'evidence_ids':['E1']}}}
+        with self.assertRaisesRegex(ValueError,'numeric values'):
+            service.parse_model_output({'message':{'content':json.dumps(answer)}},schema)
+        answer['fields']['soap_1']['text']='Pain {{N1}}.'
+        self.assertEqual(service.parse_model_output({'message':{'content':json.dumps(answer)}},schema),answer)
 
     def test_unknown_evidence_id_cannot_support_this_section(self):
         bad={'fields':{'soap_1':{'text':'Unrelated assertion','has_support':True,'evidence_ids':['E99']}}}
@@ -175,7 +196,7 @@ class EvidenceTests(unittest.TestCase):
     def test_engine_check_requires_actual_cited_symptom_output(self):
         quote='The fictional patient reports neck discomfort rated 7/10 after a fictional collision.'
         def model(prompt, schema):
-            return {'fields':{key:{'text':'Patient reports neck discomfort rated 7/10.' if key=='soap_1' else '',
+            return {'fields':{key:{'text':('Patient reports neck discomfort rated {{N1}}.' if 'pattern' in schema['properties']['fields']['properties'][key]['properties'].get('text',{}) else 'Patient reports neck discomfort rated 7/10.') if key=='soap_1' else '',
                                   'has_support':key=='soap_1','evidence_ids':['E1'] if key=='soap_1' else [],
                                   'citations':[{'source_id':'engine_fixture','page':1,'quote':quote}] if key=='soap_1' else []}
                              for key in schema['properties']['fields']['properties']}}
