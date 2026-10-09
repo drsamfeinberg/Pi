@@ -3,6 +3,7 @@ Patient source text and outputs are kept in memory; audio temp files are removed
 """
 import argparse
 import gc
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -237,6 +238,8 @@ def draft(payload, progress=lambda stage: None):
     if current:
         chunks.append(current)
     evidence = {f['id']: [] for f in fields}
+    cache=payload.get('_evidence_cache')
+    cache=cache if isinstance(cache,dict) else {}
     for i, chunk in enumerate(chunks):
         progress(f'Extracting source evidence {i+1}/{len(chunks)}')
         # Small field batches avoid asking a 4B model to map a full 29-section
@@ -244,7 +247,15 @@ def draft(payload, progress=lambda stage: None):
         for start in range(0, len(fields), 3):
             batch = fields[start:start+3]
             progress(f'Extracting source evidence {i+1}/{len(chunks)}, section group {start//3+1}/{(len(fields)+2)//3}')
-            answer = chat('Extract pertinent documented statements for each requested field, with exact source quotations. Use partial evidence and relevant history across dates. Return only short exact quotations, up to 3 per field, under 400 characters each. Empty citations only for fields without support. Do not draft section text in this extraction step. Case context:\n'+json.dumps(context)+'\nRequested sections:\n'+json.dumps(batch)+'\nSource DATA:\n'+json.dumps(chunk), output_schema(batch, evidence_only=True))
+            key=hashlib.sha256(json.dumps({'model':MODEL,'policy':SYSTEM,'writing_guidance':context['writing_guidance'],
+                                          'case_label':payload['case_label'],'sections':batch,'chunk':chunk},sort_keys=True).encode()).hexdigest()
+            answer=cache.get(key)
+            if not isinstance(answer,dict):
+                answer = chat('Extract pertinent documented statements for each requested field, with exact source quotations. Use partial evidence and relevant history across dates. Return only short exact quotations, up to 3 per field, under 400 characters each. Empty citations only for fields without support. Do not draft section text in this extraction step. Case context:\n'+json.dumps(context)+'\nRequested sections:\n'+json.dumps(batch)+'\nSource DATA:\n'+json.dumps(chunk), output_schema(batch, evidence_only=True))
+                cache[key]={'fields':{f['id']:{'citations':checked_citations(answer.get('fields',{}).get(f['id'],{}).get('citations',[]),sources)} for f in batch}}
+                while len(cache)>128:cache.pop(next(iter(cache)))
+            else:
+                progress(f'Reusing verified evidence {i+1}/{len(chunks)}, section group {start//3+1}/{(len(fields)+2)//3}')
             for f in batch:
                 value = answer.get('fields', {}).get(f['id'], {})
                 for c in checked_citations(value.get('citations', []), sources):

@@ -16,7 +16,14 @@
     "jane_soap": [
       "Write encounter-specific paragraphs: interval symptoms and functional tolerance, documented objective changes, treatment actually delivered, response and clinician plan.",
       "Compare baseline and current pain, ROM or function only when both dated measurements are documented. Distinguish new findings from carried-forward history.",
-      "Describe treatment region, technique, modality, units/time and response only if documented; give CPT rationale only from supplied clinician rationale and services."
+      "Describe treatment region, technique, modality, units/time and response only if documented; give CPT rationale only from supplied clinician rationale and services.",
+      "Match the 17 clinic sections: Chief Complaint, Spine Notes, Adjustment Notes, Additional Treatments, Patient Response, Working Diagnosis/ICD-10, Follow-Up Status, Patient is Progressing, Treatment Efficiency, Prognosis, In-Office Treatments, Frequency & Duration, Adjustive Techniques, Goals, Home/Self Care, Additional Recommendations, and CPT Rationale.",
+      "Use dated, encounter-specific detail and several focused paragraphs when supported. Chief Complaint should describe interval course, current symptoms and activity tolerance; distinguish independence from endurance and improvements from unresolved limitations.",
+      "Patient Response should separate observed movement, palpation, neurological findings and immediate treatment tolerance. Do not turn initial examination measurements into measurements at a later visit.",
+      "Follow-Up Status, Patient is Progressing, Treatment Efficiency and Prognosis are distinct: interval change, pace versus expectations, response/carryover, and documented clinician prognosis. Do not merge these into one generic assessment.",
+      "Separate treatment performed today from planned modalities and techniques. Generic printed adjustment lists, favorable responses, exercise instructions and treatment schedules are not automatic defaults.",
+      "Preserve every documented phase of a care schedule; do not omit the initial phase while retaining later phases. Include actual outcome scores and available relevant objective measurements instead of only describing the questionnaire.",
+      "Current source observations must be dated. If the selected report date differs, explicitly identify the historical visit being summarized rather than describing the patient as currently one week after a collision."
     ],
     "soap": [
       "Subjective: symptoms, onset/history, modifiers, medication response and functional limitations, attributed to patient.",

@@ -84,6 +84,14 @@ class EvidenceTests(unittest.TestCase):
         answer['fields']['soap_1']['text']='Pain {{N1}}.'
         self.assertEqual(service.parse_model_output({'message':{'content':json.dumps(answer)}},schema),answer)
 
+    def test_unchanged_evidence_reuses_extraction_but_changed_sources_invalidate_it(self):
+        payload=case();payload['_evidence_cache']={}
+        with patch.object(service,'chat',return_value=response()) as model:
+            service.draft(payload);self.assertEqual(model.call_count,2)
+            model.reset_mock();service.draft(payload);self.assertEqual(model.call_count,1)
+            payload['sources'][0]['pages'][0]+=' A new clinician observation.'
+            model.reset_mock();service.draft(payload);self.assertEqual(model.call_count,2)
+
     def test_unknown_evidence_id_cannot_support_this_section(self):
         bad={'fields':{'soap_1':{'text':'Unrelated assertion','has_support':True,'evidence_ids':['E99']}}}
         with patch.object(service, 'chat', side_effect=[

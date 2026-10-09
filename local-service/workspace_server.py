@@ -119,7 +119,7 @@ def match_sources(sources, templates):
     aliases={'soap_1':['Subjective','Patient-reported symptoms'],'soap_2':['Objective','Examination findings'],'soap_3':['Assessment','Assessment/Comments'],'soap_4':['Plan','Treatment plan']}
     for template in templates:
         for f in template['fields']:
-            for label in [f['label']]+aliases.get(f['id'],[]): headings.setdefault(normalize(label),[]).append(f['id'])
+            for label in [f['label']]+f.get('aliases',[])+aliases.get(f['id'],[]): headings.setdefault(normalize(label),[]).append(f['id'])
     matches={}
     for source in sources:
         for page,text in enumerate(source['pages'],1):
@@ -178,7 +178,8 @@ def process(case, templates, progress):
         if template.get('administrative'):
             reports[template['id']]=administrative_report(case,template); continue
         def stage(text): progress(f"Report {i+1}/{len(templates)}: {text}")
-        packet = ai.draft({'case_label':case['case_label'],'encounter':case['encounter'],'template':template,'sources':sources},stage)
+        packet = ai.draft({'case_label':case['case_label'],'encounter':case['encounter'],'template':template,'sources':sources,
+                           '_evidence_cache':case.setdefault('evidence_cache',{})},stage)
         report = packet['report']
         report['generation_method'] = 'local_ai'
         report['generated_at'] = time.time()

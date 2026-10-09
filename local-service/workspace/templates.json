@@ -153,9 +153,9 @@
   },
   {
     "id": "jane_soap",
-    "title": "PI SOAP Note — uploaded clinic template",
+    "title": "ChiroDuo PI Follow-Up SOAP — clinic template (17 sections)",
     "source_template": "pi soap note template.pdf",
-    "basis": "Includes the supplied note’s subjective, objective, follow-up, prognosis, plan and treatment sections. No default diagnoses, CPT codes, adjustments or positive treatment response are copied.",
+    "basis": "Matches the current clinic follow-up SOAP structure, including subjective, objective, progress, plan and treatment rationale. No patient values or routine treatment defaults are prefilled.",
     "fields": [
       {
         "id": "jane_soap_01",
@@ -194,8 +194,11 @@
       },
       {
         "id": "jane_soap_08",
-        "label": "Current Status of Patient’s Condition",
-        "required": true
+        "label": "Patient is Progressing",
+        "required": true,
+        "aliases": [
+          "Current Status of Patient’s Condition"
+        ]
       },
       {
         "id": "jane_soap_09",
@@ -246,7 +249,7 @@
   },
   {
     "id": "soap",
-    "title": "SOAP / Chart Note",
+    "title": "Basic SOAP / Chart Note — 4-section engine test",
     "basis": "Section structure extracted from supplied samples; formatting normalized, not a Jane App import format.",
     "fields": [
       {
