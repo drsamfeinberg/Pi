@@ -65,8 +65,14 @@ def parse_model_output(output, schema):
             raise ValueError('required section is missing or not an object')
         if 'text' in definition.get('required', []) and not isinstance(value.get('text'), str):
             raise ValueError('section text is missing or not text')
-        if not isinstance(value.get('citations'), list):
+        if 'citations' in definition.get('required', []) and not isinstance(value.get('citations'), list):
             raise ValueError('section citations are missing or not an array')
+        if 'evidence_ids' in definition.get('required', []):
+            ids=value.get('evidence_ids'); allowed=definition['properties']['evidence_ids']['items']['enum']
+            if not isinstance(ids,list) or any(not isinstance(key,str) or key not in allowed for key in ids):
+                raise ValueError('section evidence IDs are missing or unknown')
+            if type(value.get('has_support')) is not bool:
+                raise ValueError('section support decision is missing')
     return result
 
 
@@ -119,6 +125,15 @@ def output_schema(fields, evidence_only=False):
     if evidence_only:
         value['properties'].pop('text'); value['required'] = ['citations']
     return {'type': 'object', 'properties': {'fields': {'type': 'object', 'properties': {f['id']: value for f in fields}, 'required': [f['id'] for f in fields], 'additionalProperties': False}}, 'required': ['fields'], 'additionalProperties': False}
+
+
+def section_schema(field, references):
+    value = {'type':'object', 'properties': {
+        'text': {'type':'string'}, 'has_support': {'type':'boolean'},
+        'evidence_ids': {'type':'array','items':{'type':'string','enum':references}}},
+        'required':['text','has_support','evidence_ids'], 'additionalProperties':False}
+    return {'type':'object','properties':{'fields':{'type':'object','properties':{field['id']:value},
+            'required':[field['id']],'additionalProperties':False}},'required':['fields'],'additionalProperties':False}
 
 
 def validate_payload(payload):
@@ -213,16 +228,14 @@ def draft(payload, progress=lambda stage: None):
             raise ValueError('Too much competing evidence for a section. Narrow uploaded sources to this encounter.')
         text, citations = '', []
         if excerpts:
-            answer = chat('Draft this report section using ONLY these verified excerpts. Cite exact excerpts used. State discrepancies explicitly rather than choosing a conflicting schedule or finding. Use relevant historical excerpts even when their dates differ from the target report date; label historical findings and retain partial supported information. Leave empty only if these excerpts do not support the section for this patient case. Context:\n'+json.dumps(context)+'\nSection:\n'+json.dumps(f)+'\nVerified source DATA:\n'+json.dumps(excerpts), output_schema([f]))
+            references = {f'E{index+1}': citation for index, citation in enumerate(excerpts)}
+            indexed = [{'evidence_id': key, **citation} for key, citation in references.items()]
+            answer = chat('Draft this report section using ONLY the verified excerpts below. Cite the evidence IDs used in evidence_ids; DO NOT retype source quotations. Set has_support true only if the excerpts document this section. Subjective symptom history does not support Objective, Assessment or Plan. For Plan require a documented clinician decision, treatment recommendation or follow-up instruction; do not fill Plan with complaints or statements that no plan exists. If support is absent, return has_support false, empty text and empty evidence_ids. Do not output date placeholders. State documented discrepancies explicitly. Use relevant historical excerpts across dates with attribution. Context:\n'+json.dumps(context)+'\nSection:\n'+json.dumps(f)+'\nVerified source DATA:\n'+json.dumps(indexed), section_schema(f,list(references)))
             value = answer.get('fields', {}).get(f['id'], {})
-            citations = checked_citations(value.get('citations', []), sources)
-            # The drafting step may cite a shorter exact passage from an extracted
-            # quotation. It must remain inside that field's verified evidence.
-            citations = [c for c in citations if any(
-                c['source_id'] == e['source_id'] and c['page'] == e['page']
-                and normalized(c['quote']) in normalized(e['quote'])
-                for e in excerpts)]
-            if isinstance(value.get('text'), str) and len(value['text']) <= 30000 and citations:
+            ids = value.get('evidence_ids', [])
+            if isinstance(ids,list):
+                citations = [references[key] for key in dict.fromkeys(key for key in ids if isinstance(key,str)) if key in references]
+            if value.get('has_support') is True and isinstance(value.get('text'), str) and len(value['text']) <= 30000 and citations:
                 text = value['text']
         status = 'supported' if text else ('draft_not_verified' if excerpts else 'no_verified_excerpts')
         result[f['id']] = {'text': text, 'citations': citations, 'candidates': [], 'conflict': False, 'resolved': False, 'edited': False,
@@ -251,6 +264,8 @@ def check_report_engine(progress=lambda stage: None):
     value = packet['report']['fields']['soap_1']
     if not value['text'].strip() or not value['citations'] or '7/10' not in value['text']:
         raise ValueError('Engine check failed: the model did not produce the required cited subjective section from the fictional fixture. No patient case was changed.')
+    if any(packet['report']['fields'][key]['text'].strip() for key in ['soap_2','soap_3','soap_4']):
+        raise ValueError('Engine check failed: the symptom-only fixture populated an unsupported objective, assessment or plan section. No patient case was changed.')
     return {'passed':True,'model':MODEL,'message':'Engine check passed: fictional symptoms produced a cited draft. Patient-document accuracy still needs testing.'}
 
 

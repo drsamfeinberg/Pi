@@ -18,7 +18,7 @@ def case():
 
 
 def response(quote='Patient reports neck discomfort.', text='The patient reports neck discomfort.'):
-    return {'fields': {'soap_1': {'text': text, 'citations': [{'source_id': 's1', 'page': 1, 'quote': quote}]}}}
+    return {'fields': {'soap_1': {'text': text, 'has_support':True, 'evidence_ids':['E1'], 'citations': [{'source_id': 's1', 'page': 1, 'quote': quote}]}}}
 
 
 class EvidenceTests(unittest.TestCase):
@@ -41,10 +41,33 @@ class EvidenceTests(unittest.TestCase):
             packet = service.draft(case())
         self.assertIn('neck discomfort', packet['report']['fields']['soap_1']['text'])
 
-    def test_quote_elsewhere_on_page_cannot_support_this_section(self):
+    def test_source_quote_is_immutable_when_drafting_references_verified_evidence(self):
+        payload=case();quote='Patient reports neck discomfort rated 7/10.'
+        payload['sources'][0]['pages']=[quote]
+        extraction=response(quote)
+        synthesis={'fields':{'soap_1':{'text':'Patient reports neck discomfort rated 7/10.',
+                                      'has_support':True,'evidence_ids':['E1'],
+                                      'citations':[{'source_id':'s1','page':1,'quote':'Patient reports neck discomfort rated 7/1:10.'}]}}}
+        with patch.object(service,'chat',side_effect=[extraction,synthesis]) as model:
+            report=service.draft(payload)['report']
+        self.assertEqual(report['fields']['soap_1']['citations'][0]['quote'],quote)
+        self.assertIn('7/10',report['fields']['soap_1']['text'])
+        self.assertIn('DO NOT retype',model.call_args_list[1].args[0])
+        self.assertNotIn('citations',model.call_args_list[1].args[1]['properties']['fields']['properties']['soap_1']['properties'])
+
+    def test_symptom_only_excerpt_does_not_fill_plan_when_support_is_false(self):
+        payload=case();payload['template']['fields']=[{'id':'soap_4','label':'Plan'}]
+        extraction={'fields':{'soap_4':{'citations':[{'source_id':'s1','page':1,'quote':'Patient reports neck discomfort.'}]}}}
+        synthesis={'fields':{'soap_4':{'text':'Patient reports neck discomfort.','has_support':False,'evidence_ids':['E1']}}}
+        with patch.object(service,'chat',side_effect=[extraction,synthesis]):
+            value=service.draft(payload)['report']['fields']['soap_4']
+        self.assertEqual(value['text'],'')
+
+    def test_unknown_evidence_id_cannot_support_this_section(self):
+        bad={'fields':{'soap_1':{'text':'Unrelated assertion','has_support':True,'evidence_ids':['E99']}}}
         with patch.object(service, 'chat', side_effect=[
             response('Patient reports neck discomfort.'),
-            response('No other documented findings.', 'Unrelated assertion')]):
+            bad]):
             packet = service.draft(case())
         self.assertEqual(packet['report']['fields']['soap_1']['text'], '')
 
@@ -153,6 +176,7 @@ class EvidenceTests(unittest.TestCase):
         quote='The fictional patient reports neck discomfort rated 7/10 after a fictional collision.'
         def model(prompt, schema):
             return {'fields':{key:{'text':'Patient reports neck discomfort rated 7/10.' if key=='soap_1' else '',
+                                  'has_support':key=='soap_1','evidence_ids':['E1'] if key=='soap_1' else [],
                                   'citations':[{'source_id':'engine_fixture','page':1,'quote':quote}] if key=='soap_1' else []}
                              for key in schema['properties']['fields']['properties']}}
         with patch.object(service,'chat',side_effect=model):
