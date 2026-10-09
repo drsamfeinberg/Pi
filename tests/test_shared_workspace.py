@@ -59,6 +59,13 @@ class WorkspaceTests(unittest.TestCase):
   self.assertEqual(reports['soap']['fields']['soap_1']['text'],'');self.assertTrue(reports['soap']['fields']['soap_1']['conflict'])
   case={'case_label':'Fictional','encounter':'2026-01-15','sources':[{'id':'t','name':'Template','pages':['Subjective: Example finding.'],'kind':'template'}]}
   with self.assertRaises(ValueError):app.process(case,[template],lambda x:None)
+ def test_completed_example_upload_stays_excluded_from_evidence(self):
+  worker=self.login('worker');case=self.newcase(worker)
+  case=self.api('/cases/'+case['id']+'/sources',{'version':case['version'],'source':{'name':'Fictional style reference','kind':'example','pages':['Subjective: Example neck symptom.']}},worker)
+  self.assertEqual(app.evidence_sources(case),[])
+  with self.assertRaises(HTTPError) as error:
+   self.api('/cases/'+case['id']+'/source_selection',{'version':case['version'],'source_id':case['sources'][0]['id'],'included':True},worker)
+  self.assertEqual(error.exception.code,409)
  def test_unsigned_sources_cannot_supply_approved_report_and_normal_web_origins_rejected(self):
   with self.assertRaises(HTTPError):self.api('/cases')
   with self.assertRaises(HTTPError):self.api('/login',{'name':'worker','password':self.passwords['worker']},origin='https://attacker.example')

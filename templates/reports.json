@@ -685,5 +685,65 @@
         "static_text": "UNSIGNED FORM. This application has not executed or verified any patient, attorney, insurance, witness or notarial signature or acknowledgment. Complete the required execution process separately."
       }
     ]
+  },
+  {
+    "id": "mri",
+    "title": "MRI Analysis Report",
+    "fields": [
+      {
+        "id": "mri_1",
+        "label": "Study Indication and History"
+      },
+      {
+        "id": "mri_2",
+        "label": "Study Details and Report Source"
+      },
+      {
+        "id": "mri_3",
+        "label": "Reported MRI Findings by Region and Level"
+      },
+      {
+        "id": "mri_4",
+        "label": "Findings Summary / Conclusion"
+      },
+      {
+        "id": "mri_5",
+        "label": "Documented Clinical Correlation"
+      },
+      {
+        "id": "mri_6",
+        "label": "Verified Supporting Literature"
+      },
+      {
+        "id": "mri_7",
+        "label": "Documented Recommendations / Referrals"
+      },
+      {
+        "id": "mri_8",
+        "label": "Follow-Up and Source Limitations"
+      }
+    ]
+  },
+  {
+    "id": "billing",
+    "title": "Itemized Billing Statement — source summary draft",
+    "fields": [
+      {
+        "id": "billing_1",
+        "label": "Statement Identity and Period"
+      },
+      {
+        "id": "billing_2",
+        "label": "Documented Itemized Services and Charges"
+      },
+      {
+        "id": "billing_3",
+        "label": "Reported Payments, Adjustments and Balance"
+      },
+      {
+        "id": "billing_4",
+        "label": "Ledger Discrepancies / Financial Review"
+      }
+    ]
   }
 ]

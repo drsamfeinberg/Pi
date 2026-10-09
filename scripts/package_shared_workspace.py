@@ -3,8 +3,8 @@ from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 import argparse
 ROOT=Path(__file__).resolve().parents[1]
-FILES=['workspace_server.py','pi_service.py','requirements.txt','WORKSPACE_README.md','pdf.mjs','pdf.worker.mjs','LICENSE','workspace/index.html','workspace/app.js','workspace/style.css','workspace/templates.json']
-PATCH_FILES=['workspace_server.py','pi_service.py','workspace/app.js','workspace/index.html','WORKSPACE_README.md']
+FILES=['workspace_server.py','pi_service.py','report_writing_profiles.json','requirements.txt','WORKSPACE_README.md','pdf.mjs','pdf.worker.mjs','LICENSE','workspace/index.html','workspace/app.js','workspace/style.css','workspace/templates.json']
+PATCH_FILES=['workspace_server.py','pi_service.py','report_writing_profiles.json','workspace/templates.json','workspace/app.js','workspace/index.html','WORKSPACE_README.md']
 def package(output, patch=False):
  output.parent.mkdir(parents=True,exist_ok=True)
  with ZipFile(output,'w',ZIP_DEFLATED) as z:

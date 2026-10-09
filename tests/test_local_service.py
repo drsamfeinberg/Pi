@@ -60,6 +60,22 @@ class EvidenceTests(unittest.TestCase):
         self.assertIn('Subjective', prompt)
         self.assertIn('neck discomfort', packet['report']['fields']['soap_1']['text'])
 
+    def test_style_profile_reaches_model_without_sample_patient_details(self):
+        with patch.object(service, 'chat', return_value=response()) as model:
+            service.draft(case())
+        prompt = model.call_args_list[0].args[0]
+        self.assertIn('writing_guidance', prompt)
+        self.assertIn('Subjective:', prompt)
+        guide = json.dumps(service.writing_guidance('soap'))
+        self.assertNotRegex(guide, r'\b\d{4}-\d{2}-\d{2}\b|[\w.+-]+@[\w.-]+')
+        self.assertIn('specific task', str(service.writing_guidance('dud_loe')))
+        self.assertIn('verified', str(service.writing_guidance('mri')))
+
+    def test_style_example_is_rejected_as_clinical_source(self):
+        payload = case(); payload['sources'][0]['kind'] = 'example'
+        with self.assertRaisesRegex(ValueError, 'not patient evidence'):
+            service.validate_payload(payload)
+
     def test_large_template_extracts_small_labeled_batches(self):
         payload = case()
         payload['template']['fields'] = [{'id': 'field_'+str(i), 'label': 'Clinical section '+str(i)} for i in range(13)]

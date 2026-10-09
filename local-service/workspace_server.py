@@ -133,7 +133,7 @@ def is_demo_source(source):
     return source.get('demo') is True or source.get('name') == DEMO_SOURCE_NAME
 
 def evidence_sources(case, include_demo=False):
-    return [s for s in case['sources'] if s.get('kind') != 'template' and s.get('included', True) is not False and (include_demo or not is_demo_source(s))]
+    return [s for s in case['sources'] if s.get('kind') not in ('template', 'example') and s.get('included', True) is not False and (include_demo or not is_demo_source(s))]
 
 
 def process(case, templates, progress):
@@ -319,12 +319,12 @@ class Handler(ai.Handler):
             if action=='source_selection':
                 source=next((s for s in case['sources'] if s['id']==body.get('source_id')),None)
                 if not source or type(body.get('included')) is not bool: raise ValueError('Invalid source selection.')
-                if body['included'] and (source.get('kind')=='template' or is_demo_source(source)): raise ValueError('Demo notes and template references cannot be used as AI evidence.')
+                if body['included'] and (source.get('kind') in ('template','example') or is_demo_source(source)): raise ValueError('Demo notes, template references and style examples cannot be used as AI evidence.')
                 source['included']=body['included']; invalidate(case)
                 self.send(200,save_case(user,case,version,'evidence selection edited; approvals cleared')); return
             if action=='sources':
                 source=body.get('source',{}); pages=source.get('pages'); kind=source.get('kind','clinical'); name=source.get('name','')
-                if not isinstance(name,str) or not name.strip() or len(name)>300 or kind not in ['clinical','police','imaging','transcript','template'] or not isinstance(pages,list) or not pages or len(pages)>500 or any(not isinstance(p,str) for p in pages): raise ValueError('Invalid source.')
+                if not isinstance(name,str) or not name.strip() or len(name)>300 or kind not in ['clinical','police','imaging','transcript','template','example'] or not isinstance(pages,list) or not pages or len(pages)>500 or any(not isinstance(p,str) for p in pages): raise ValueError('Invalid source.')
                 if len(case['sources'])>=20 or sum(len(p) for s in case['sources'] for p in s['pages'])+sum(map(len,pages))>2000000: raise ValueError('Case source limit reached.')
                 case['sources'].append({'id':secrets.token_hex(12),'name':name,'pages':pages,'kind':kind,'demo':bool(source.get('demo'))}); invalidate(case)
                 self.send(200,save_case(user,case,version,'source added; approvals cleared')); return

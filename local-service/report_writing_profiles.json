@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "purpose": "Reusable writing instructions abstracted from user-supplied completed reports. No patient-specific text is included. Not a verified legal standard or model fine-tuning.",
+  "general": [
+    "Match the template headings and write clear professional clinical prose. Use several focused sentences when evidence warrants detail; do not pad short evidence to imitate sample length.",
+    "Connect documented symptoms and findings to documented functional effects. Attribute interpretations and preserve limitations and contradictions.",
+    "Use chronological and comparative reasoning across records without merging patient identities or treating historical findings as current.",
+    "Example reports teach style and organization only. Never transfer example facts, measurements, diagnoses, codes, signatures, prognosis, legal opinions, fees or clinical plans into the current case."
+  ],
+  "profiles": {
+    "jane_evaluation": [
+      "Use the clinic section order. Begin with the patient presentation and dated collision/intake chronology; describe onset, location, intensity, provoking/relieving factors and associated symptoms where documented.",
+      "Expand body-chart, vitals, posture, ROM and neurological sections only from actual documented answers or clinician measurements. Attribute intake diagrams as subjective.",
+      "Use practical function and patient goals to explain the complaint. Keep clinician assessment, planned care and home instructions distinct from patient expectations."
+    ],
+    "jane_soap": [
+      "Write encounter-specific paragraphs: interval symptoms and functional tolerance, documented objective changes, treatment actually delivered, response and clinician plan.",
+      "Compare baseline and current pain, ROM or function only when both dated measurements are documented. Distinguish new findings from carried-forward history.",
+      "Describe treatment region, technique, modality, units/time and response only if documented; give CPT rationale only from supplied clinician rationale and services."
+    ],
+    "soap": [
+      "Subjective: symptoms, onset/history, modifiers, medication response and functional limitations, attributed to patient.",
+      "Objective: dated measured examination and reported diagnostic findings; no normal defaults.",
+      "Assessment and plan: documented clinician diagnosis, interpretation, course, response and decisions. Preserve partial useful sections when other sections are unsupported."
+    ],
+    "physician": [
+      "Use a coherent chronological history before diagnoses, objective findings, outcome measures, professional opinion, work effects, prognosis and planned care.",
+      "Organize clinician-documented diagnoses by involved region and include supplied codes without choosing new diagnoses from symptoms.",
+      "Retain measured scores, scale name, date and documented interpretation; do not reuse example thresholds or calculate impairment from an outcome score.",
+      "Attribute clinician causation and medical-necessity opinions. Distinguish an initial projected care course from actual subsequent discharge."
+    ],
+    "dud_loe": [
+      "For each template activity category, describe the specific task, prior baseline, reported symptom during the task, tolerance/modification, timing and real-life effect when supplied.",
+      "Use concrete occupational, domestic, household, childcare, sport and hobby descriptions; avoid repeating generic pain claims across all sections.",
+      "Distinguish missed work from working with discomfort; reduced tolerance does not establish lost wages, job insecurity, disability or stopped hobbies.",
+      "Preserve activities that remain possible and documented absences of limitations. Do not import the example occupation, family situation or tasks."
+    ],
+    "narrative": [
+      "Present the treatment span and verified administrative totals, collision/history, pre-existing conditions, region-specific findings, diagnostic testing, care course, response, discharge status and future clinician recommendations in template order.",
+      "Build a dated baseline-to-final comparison with actual findings and functional changes; distinguish projected from delivered treatment.",
+      "Describe residual symptoms separately from clinician-established permanent impairment, disability or MMI. Do not assign ratings or infer MMI from improvement alone.",
+      "Future-care frequency, duration, fees and prognosis must come from this case's clinician and financial sources; sample schedules and costs are never defaults."
+    ],
+    "imaging": [
+      "Summarize supplied radiologist/clinician findings by region and reported level; preserve measurements, negatives, limitations and author attribution.",
+      "Separate imaging observations, existing clinician interpretation, and documented recommendations. No independent diagnosis from raw images or dating a lesion without supporting opinion."
+    ],
+    "mri": [
+      "Use the sample structure: indication, study/date and source, reported findings by region/level, conclusion, existing clinician correlation, verified literature if supplied, and documented recommendations.",
+      "Preserve reported disc, canal, foraminal, cord and other findings without treating degenerative findings as automatically accident-caused.",
+      "Do not interpret MRI screenshots independently; summaries must be based on a supplied radiology report or explicit clinician interpretation.",
+      "Only include literature whose source and relevance have been verified; never fabricate studies, author names or guideline endorsements."
+    ],
+    "cover": [
+      "Write a concise professional transmittal: purpose, relevant accident/treatment dates if documented, exact enclosure list, contact closing.",
+      "List only documents actually supplied or confirmed prepared; do not claim a complete packet, executed lien or signed report exists without evidence.",
+      "Do not reproduce sample recipient, contact information, provider identifiers or signatures."
+    ],
+    "billing": [
+      "Reproduce documented statement identity/period, itemized service entries, supplied amounts and account summary with citations.",
+      "Keep charge, payment, adjustment, insurer/attorney and patient ledger allocations distinct; a duplicate allocation is not a second delivered service.",
+      "Do not infer CPT codes, timed units or payable charges from narrative treatment descriptions. Do not calculate or assert ledger reconciliation with the language model.",
+      "Copy documented totals as reported and flag conflicting counts/amounts for financial review. This draft is a source summary, not an issued invoice."
+    ],
+    "lien": [
+      "Retain the clinic-provided fixed bilingual legal wording; populate only verified case/administrative details.",
+      "Never reuse a sample patient authorization, attorney, signature, witness, execution date or attestation.",
+      "The model must not rewrite the approved legal body or assert legal validity from sample wording."
+    ],
+    "packet": [
+      "The complete medical file is a packet containing individual documents, not one new clinical note. Keep document boundaries and dates.",
+      "Avoid double-counting care or charges when the same chart/report occurs as a separate upload and inside a complete packet.",
+      "A packet manifest must list actual prepared files; formatting style does not establish completeness or authorization to send."
+    ]
+  }
+}
