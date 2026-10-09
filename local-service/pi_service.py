@@ -157,8 +157,12 @@ def draft(payload, progress=lambda stage: None):
             answer = chat('Draft this report section using ONLY these verified excerpts. Cite exact excerpts used. State discrepancies explicitly rather than choosing a conflicting schedule or finding. Leave empty if the excerpts do not support this section for the selected patient/encounter. Context:\n'+json.dumps(context)+'\nSection:\n'+json.dumps(f)+'\nVerified source DATA:\n'+json.dumps(excerpts), output_schema([f]))
             value = answer.get('fields', {}).get(f['id'], {})
             citations = checked_citations(value.get('citations', []), sources)
-            allowed = {(c['source_id'], c['page'], normalized(c['quote'])) for c in excerpts}
-            citations = [c for c in citations if (c['source_id'], c['page'], normalized(c['quote'])) in allowed]
+            # The drafting step may cite a shorter exact passage from an extracted
+            # quotation. It must remain inside that field's verified evidence.
+            citations = [c for c in citations if any(
+                c['source_id'] == e['source_id'] and c['page'] == e['page']
+                and normalized(c['quote']) in normalized(e['quote'])
+                for e in excerpts)]
             if isinstance(value.get('text'), str) and len(value['text']) <= 30000 and citations:
                 text = value['text']
         result[f['id']] = {'text': text, 'citations': citations, 'candidates': [], 'conflict': False, 'resolved': False, 'edited': False}

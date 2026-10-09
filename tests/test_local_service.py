@@ -34,6 +34,20 @@ class EvidenceTests(unittest.TestCase):
             packet = service.draft(case())
         self.assertEqual(packet['report']['fields']['soap_1']['text'], '')
 
+    def test_shorter_exact_quote_from_verified_passage_is_accepted(self):
+        with patch.object(service, 'chat', side_effect=[
+            response('Patient reports neck discomfort. No other documented findings.'),
+            response('Patient reports neck discomfort.')]):
+            packet = service.draft(case())
+        self.assertIn('neck discomfort', packet['report']['fields']['soap_1']['text'])
+
+    def test_quote_elsewhere_on_page_cannot_support_this_section(self):
+        with patch.object(service, 'chat', side_effect=[
+            response('Patient reports neck discomfort.'),
+            response('No other documented findings.', 'Unrelated assertion')]):
+            packet = service.draft(case())
+        self.assertEqual(packet['report']['fields']['soap_1']['text'], '')
+
     def test_uncited_generated_text_is_discarded(self):
         bad = {'fields': {'soap_1': {'text': 'Unsupported finding', 'citations': []}}}
         with patch.object(service, 'chat', side_effect=[response(), bad]):
