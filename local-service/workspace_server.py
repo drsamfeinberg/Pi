@@ -291,7 +291,9 @@ class Handler(ai.Handler):
                 with LOCK: JOBS[job_id].update(status='complete',result=value)
             except Exception as e:
                 error=str(e) if isinstance(e,ValueError) else 'Local processing failed. Check installed models and source format.'
-                with LOCK: JOBS[job_id].update(status='error',error=error)
+                with LOCK:
+                    stage=JOBS[job_id]['stage']
+                    JOBS[job_id].update(status='error',error=f'{stage}: {error}')
             finally:
                 with LOCK: CONTROLS.pop(job_id,None)
                 BUSY.release()
@@ -342,6 +344,8 @@ class Handler(ai.Handler):
                 control={'cancel':threading.Event()}
                 self.launch(user,lambda progress:audio_task(audio,suffix,progress,control),control); return
             body=json.loads(self.body())
+            if path=='/api/check-engine':
+                self.launch(user,ai.check_report_engine); return
             if path=='/api/visual-extract':
                 def read_page(progress):
                     progress('Reading printed text, handwriting, checkboxes and diagram marks locally')

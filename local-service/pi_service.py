@@ -47,43 +47,77 @@ def normalized(text):
     return re.sub(r'\s+', ' ', text).strip()
 
 
+def parse_model_output(output, schema):
+    content = output.get('message', {}).get('content', '')
+    if not isinstance(content, str):
+        raise ValueError('content is not text')
+    content = content.strip()
+    # Remove a complete code fence only; never invent missing JSON delimiters.
+    if content.startswith('```') and content.endswith('```'):
+        content = re.sub(r'^```(?:json)?\s*', '', content[:-3], flags=re.IGNORECASE).strip()
+    result = json.loads(content)
+    if not isinstance(result, dict) or not isinstance(result.get('fields'), dict):
+        raise ValueError('fields is not an object')
+    expected = schema.get('properties', {}).get('fields', {}).get('properties', {})
+    for field_id, definition in expected.items():
+        value = result['fields'].get(field_id)
+        if not isinstance(value, dict):
+            raise ValueError('required section is missing or not an object')
+        if 'text' in definition.get('required', []) and not isinstance(value.get('text'), str):
+            raise ValueError('section text is missing or not text')
+        if not isinstance(value.get('citations'), list):
+            raise ValueError('section citations are missing or not an array')
+    return result
+
+
 def chat(prompt, schema):
-    data = json.dumps({'model': MODEL, 'stream': False, 'think': False,
-        'messages': [{'role': 'system', 'content': SYSTEM}, {'role': 'user', 'content': prompt}],
-        'format': schema, 'options': {'temperature': 0, 'num_ctx': 8192, 'num_predict': 3500}}).encode()
-    request = Request('http://127.0.0.1:11434/api/chat', data=data, headers={'Content-Type': 'application/json'})
-    try:
-        with urlopen(request, timeout=900) as response:
-            output = json.load(response)
-    except HTTPError as error:
-        if error.code == 404:
-            detail = f'Ollama could not find drafting model {MODEL}. Run ollama pull {MODEL} in another Terminal window.'
-        elif error.code == 400:
-            detail = 'Ollama rejected the structured drafting request (HTTP 400). Check your Ollama version and update it.'
-        elif error.code >= 500:
-            detail = f'Ollama could not run the drafting model (HTTP {error.code}). Check available memory and test the model directly.'
-        else:
-            detail = f'Ollama returned HTTP {error.code}; no report was generated.'
-        raise ValueError(detail) from error
-    except (TimeoutError, URLError) as error:
-        raise ValueError('Cannot complete the local Ollama request. Make sure Ollama is running at 127.0.0.1:11434; a timeout may also indicate slow model processing.') from error
-    except Exception as error:
-        raise ValueError('Ollama returned an unreadable response; no report was generated.') from error
-    try:
-        result = json.loads(output['message']['content'])
-        if not isinstance(result, dict) or not isinstance(result.get('fields'), dict):
-            raise ValueError('Invalid fields')
-        return result
-    except Exception as error:
-        # Distinguish formatting failures from a missing model; never expose response/source text.
-        raise ValueError('The local model did not return a complete structured report. Try a shorter source or the compact SOAP template first; this is a model-output error, not missing patient findings.') from error
+    last_failure = None
+    for attempt in range(2):
+        request_prompt = prompt
+        if attempt:
+            request_prompt += '\nFORMAT RETRY: Return only one complete JSON object matching the schema, every required field included. Keep quotations short and exact; use up to 3 citations per section, each under 400 characters. Empty arrays for absent evidence. No markdown or commentary.'
+        data = json.dumps({'model': MODEL, 'stream': False, 'think': False,
+            'messages': [{'role': 'system', 'content': SYSTEM}, {'role': 'user', 'content': request_prompt}],
+            'format': schema, 'options': {'temperature': 0, 'num_ctx': 8192, 'num_predict': 3500 if not attempt else 5500}}).encode()
+        request = Request('http://127.0.0.1:11434/api/chat', data=data, headers={'Content-Type': 'application/json'})
+        try:
+            with urlopen(request, timeout=900) as response:
+                output = json.load(response)
+        except HTTPError as error:
+            if error.code == 404:
+                detail = f'Ollama could not find drafting model {MODEL}. Run ollama pull {MODEL} in another Terminal window.'
+            elif error.code == 400:
+                detail = 'Ollama rejected the structured drafting request (HTTP 400). Check your Ollama version and update it.'
+            elif error.code >= 500:
+                detail = f'Ollama could not run the drafting model (HTTP {error.code}). Check available memory and test the model directly.'
+            else:
+                detail = f'Ollama returned HTTP {error.code}; no report was generated.'
+            raise ValueError(detail) from error
+        except (TimeoutError, URLError) as error:
+            raise ValueError('Cannot complete the local Ollama request. Make sure Ollama is running at 127.0.0.1:11434; a timeout may also indicate slow model processing.') from error
+        except Exception as error:
+            raise ValueError('Ollama returned an unreadable response; no report was generated.') from error
+        try:
+            return parse_model_output(output, schema)
+        except (ValueError, TypeError, AttributeError) as error:
+            # Diagnostics contain shape/counts only, never patient text or prompts.
+            reason = output.get('done_reason', 'unknown') if isinstance(output, dict) else 'invalid envelope'
+            reason = reason if reason in ['stop','length','load','unknown','invalid envelope'] else 'other'
+            tokens = output.get('eval_count', 0) if isinstance(output, dict) else 0
+            tokens = tokens if type(tokens) is int else 0
+            content = output.get('message', {}).get('content', '') if isinstance(output, dict) and isinstance(output.get('message'), dict) else ''
+            category = 'invalid JSON' if isinstance(error, json.JSONDecodeError) else 'incorrect section structure'
+            last_failure = f'{category}; stop={reason}; output_tokens={tokens}; response_characters={len(content) if isinstance(content,str) else 0}'
+    raise ValueError(f'Local model-output error after one format retry: {last_failure}. No new report was saved. This is an engine failure, not missing patient findings.')
 
 
 CITATION_SCHEMA = {'type': 'object', 'properties': {'source_id': {'type': 'string'}, 'page': {'type': 'integer'}, 'quote': {'type': 'string'}}, 'required': ['source_id', 'page', 'quote'], 'additionalProperties': False}
 
 
-def output_schema(fields):
+def output_schema(fields, evidence_only=False):
     value = {'type': 'object', 'properties': {'text': {'type': 'string'}, 'citations': {'type': 'array', 'items': CITATION_SCHEMA}}, 'required': ['text', 'citations'], 'additionalProperties': False}
+    if evidence_only:
+        value['properties'].pop('text'); value['required'] = ['citations']
     return {'type': 'object', 'properties': {'fields': {'type': 'object', 'properties': {f['id']: value for f in fields}, 'required': [f['id'] for f in fields], 'additionalProperties': False}}, 'required': ['fields'], 'additionalProperties': False}
 
 
@@ -149,9 +183,9 @@ def draft(payload, progress=lambda stage: None):
     for source in sources:
         for page, text in enumerate(source['pages'], 1):
             # Every excerpt retains its original PDF page number.
-            for start in range(0, len(text), 7000):
-                excerpt = {'source_id': source['id'], 'name': source['name'], 'page': page, 'kind': source.get('kind', 'clinical'), 'text': text[start:start+7000]}
-                if size + len(excerpt['text']) > 10000 and current:
+            for start in range(0, len(text), 3500):
+                excerpt = {'source_id': source['id'], 'name': source['name'], 'page': page, 'kind': source.get('kind', 'clinical'), 'text': text[start:start+3500]}
+                if size + len(excerpt['text']) > 4500 and current:
                     chunks.append(current); current, size = [], 0
                 current.append(excerpt); size += len(excerpt['text'])
     if current:
@@ -161,10 +195,10 @@ def draft(payload, progress=lambda stage: None):
         progress(f'Extracting source evidence {i+1}/{len(chunks)}')
         # Small field batches avoid asking a 4B model to map a full 29-section
         # form at once. Supply readable labels as well as machine IDs.
-        for start in range(0, len(fields), 6):
-            batch = fields[start:start+6]
-            progress(f'Extracting source evidence {i+1}/{len(chunks)}, section group {start//6+1}/{(len(fields)+5)//6}')
-            answer = chat('Extract pertinent documented statements for each requested field, with exact source quotations. Use partial evidence and relevant history across dates. Empty text and citations only for fields without support. Case context:\n'+json.dumps(context)+'\nRequested sections:\n'+json.dumps(batch)+'\nSource DATA:\n'+json.dumps(chunk), output_schema(batch))
+        for start in range(0, len(fields), 3):
+            batch = fields[start:start+3]
+            progress(f'Extracting source evidence {i+1}/{len(chunks)}, section group {start//3+1}/{(len(fields)+2)//3}')
+            answer = chat('Extract pertinent documented statements for each requested field, with exact source quotations. Use partial evidence and relevant history across dates. Return only short exact quotations, up to 3 per field, under 400 characters each. Empty citations only for fields without support. Do not draft section text in this extraction step. Case context:\n'+json.dumps(context)+'\nRequested sections:\n'+json.dumps(batch)+'\nSource DATA:\n'+json.dumps(chunk), output_schema(batch, evidence_only=True))
             for f in batch:
                 value = answer.get('fields', {}).get(f['id'], {})
                 for c in checked_citations(value.get('citations', []), sources):
@@ -204,6 +238,20 @@ def unload_ollama():
             response.read()
     except Exception:
         pass
+
+
+def check_report_engine(progress=lambda stage: None):
+    fields = [{'id':'soap_1','label':'Subjective'}, {'id':'soap_2','label':'Objective'},
+              {'id':'soap_3','label':'Assessment/Comments'}, {'id':'soap_4','label':'Plan'}]
+    payload = {'case_label':'Fictional engine test', 'encounter':'2026-01-15',
+               'template':{'id':'soap','title':'SOAP engine check','fields':fields},
+               'sources':[{'id':'engine_fixture','name':'Fictional engine note','kind':'clinical',
+                           'pages':['The fictional patient reports neck discomfort rated 7/10 after a fictional collision. No examination findings, diagnosis or treatment plan are provided.']}]}
+    packet = draft(payload, progress)
+    value = packet['report']['fields']['soap_1']
+    if not value['text'].strip() or not value['citations'] or '7/10' not in value['text']:
+        raise ValueError('Engine check failed: the model did not produce the required cited subjective section from the fictional fixture. No patient case was changed.')
+    return {'passed':True,'model':MODEL,'message':'Engine check passed: fictional symptoms produced a cited draft. Patient-document accuracy still needs testing.'}
 
 
 def transcribe(audio, suffix, progress=lambda stage: None):

@@ -81,14 +81,14 @@ class EvidenceTests(unittest.TestCase):
         payload['template']['fields'] = [{'id': 'field_'+str(i), 'label': 'Clinical section '+str(i)} for i in range(13)]
         def empty_model(prompt, schema):
             ids = list(schema['properties']['fields']['properties'])
-            self.assertLessEqual(len(ids), 6)
+            self.assertLessEqual(len(ids), 3)
             for field in ids:
                 label = next(f['label'] for f in payload['template']['fields'] if f['id'] == field)
                 self.assertIn(label, prompt)
             return {'fields': {i: {'text': '', 'citations': []} for i in ids}}
         with patch.object(service, 'chat', side_effect=empty_model) as model:
             packet = service.draft(payload)
-        self.assertEqual(model.call_count, 3)
+        self.assertEqual(model.call_count, 5)
         self.assertEqual(len(packet['report']['fields']), 13)
 
     def test_uncited_generated_text_is_discarded(self):
@@ -115,9 +115,50 @@ class EvidenceTests(unittest.TestCase):
 
     def test_incomplete_model_json_is_not_misreported_as_missing_model(self):
         import io
-        response = io.BytesIO(json.dumps({'message':{'content':'{"fields":'}}).encode())
-        with patch.object(service, 'urlopen', return_value=response):
+        responses = [io.BytesIO(json.dumps({'message':{'content':'{"fields":'}, 'done_reason':'length', 'eval_count':3500}).encode()) for _ in range(2)]
+        with patch.object(service, 'urlopen', side_effect=responses):
             with self.assertRaisesRegex(ValueError, 'model-output error'): service.chat('Fictional input', {})
+
+    def test_complete_fenced_json_is_accepted_without_retry(self):
+        import io
+        envelope = {'message': {'content': '```json\n'+json.dumps(response())+'\n```'}}
+        with patch.object(service, 'urlopen', return_value=io.BytesIO(json.dumps(envelope).encode())) as request:
+            result = service.chat('Fictional input', service.output_schema(case()['template']['fields']))
+        self.assertIn('neck discomfort', result['fields']['soap_1']['text'])
+        self.assertEqual(request.call_count, 1)
+
+    def test_truncated_response_retries_once_and_validates_required_fields(self):
+        import io
+        replies = [{'message': {'content': '{"fields":'}, 'done_reason': 'length'}, {'message': {'content': json.dumps(response())}, 'done_reason': 'stop'}]
+        requests=[]
+        def reply(request, timeout):
+            requests.append(json.loads(request.data))
+            return io.BytesIO(json.dumps(replies[len(requests)-1]).encode())
+        with patch.object(service, 'urlopen', side_effect=reply):
+            result=service.chat('Fictional input',service.output_schema(case()['template']['fields']))
+        self.assertEqual(len(requests),2)
+        self.assertIn('FORMAT RETRY',requests[1]['messages'][1]['content'])
+        self.assertIn('neck discomfort',result['fields']['soap_1']['text'])
+
+    def test_missing_field_is_engine_error_and_diagnostics_do_not_expose_content(self):
+        import io
+        private='Fictional confidential fixture'
+        replies=[io.BytesIO(json.dumps({'message':{'content':json.dumps({'fields':{},'extra':private})},'done_reason':'stop','eval_count':12}).encode()) for _ in range(2)]
+        with patch.object(service,'urlopen',side_effect=replies):
+            with self.assertRaisesRegex(ValueError,'incorrect section structure') as error:
+                service.chat('Fictional input',service.output_schema(case()['template']['fields']))
+        self.assertNotIn(private,str(error.exception));self.assertIn('output_tokens=12',str(error.exception))
+
+    def test_engine_check_requires_actual_cited_symptom_output(self):
+        quote='The fictional patient reports neck discomfort rated 7/10 after a fictional collision.'
+        def model(prompt, schema):
+            return {'fields':{key:{'text':'Patient reports neck discomfort rated 7/10.' if key=='soap_1' else '',
+                                  'citations':[{'source_id':'engine_fixture','page':1,'quote':quote}] if key=='soap_1' else []}
+                             for key in schema['properties']['fields']['properties']}}
+        with patch.object(service,'chat',side_effect=model):
+            self.assertTrue(service.check_report_engine()['passed'])
+        with patch.object(service,'chat',return_value={'fields':{}}):
+            with self.assertRaisesRegex(ValueError,'Engine check failed'):service.check_report_engine()
 
 
 class ConnectionTests(unittest.TestCase):

@@ -26,3 +26,9 @@ test('cancel transcription asks server to stop and restores generation without s
  await p.locator('#cancel-job').click();await p.waitForFunction(()=>document.getElementById('message').textContent.includes('canceled'));
  assert.equal(await p.locator('#generate').isDisabled(),false);assert.equal(await p.locator('#notes').inputValue(),'');assert.equal(await p.locator('#sources summary').count(),0);
  }finally{await context.close();}});
+test('report engine check reports a fictional result without changing case evidence or reports',async()=>{const {context,page:p}=await login('worker');try{
+ await p.locator('#case-label').fill('Fictional engine-check case');await p.locator('#encounter').fill('2026-01-15');await p.locator('#create').click();await p.locator('#case-title').waitFor();
+ await p.route(base+'/api/check-engine',r=>r.fulfill({json:{job_id:'engine-test'}}));await p.route(base+'/api/jobs/engine-test',r=>r.fulfill({json:{status:'complete',result:{passed:true,message:'Engine check passed: fictional symptoms produced a cited draft.'}}}));
+ await p.locator('#check-engine').click();await p.waitForFunction(()=>document.getElementById('engine-status').textContent.includes('passed'));
+ assert.equal(await p.locator('#sources summary').count(),0);assert.equal(await p.locator('#report-select option').count(),0);
+ }finally{await context.close();}});
