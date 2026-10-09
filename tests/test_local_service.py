@@ -24,21 +24,21 @@ def response(quote='Patient reports neck discomfort.', text='The patient reports
 class EvidenceTests(unittest.TestCase):
     def test_generated_draft_has_verified_citations_and_is_unsigned(self):
         with patch.object(service, 'chat', return_value=response()):
-            packet = service.draft(case())
+            packet = service.draft_legacy(case())
         self.assertEqual(packet['report']['status'], 'draft')
         self.assertEqual(packet['report']['fields']['soap_1']['citations'][0]['page'], 1)
         self.assertIn('neck discomfort', packet['report']['fields']['soap_1']['text'])
 
     def test_fabricated_quotation_does_not_enter_draft(self):
         with patch.object(service, 'chat', return_value=response('Invented fracture finding.')):
-            packet = service.draft(case())
+            packet = service.draft_legacy(case())
         self.assertEqual(packet['report']['fields']['soap_1']['text'], '')
 
     def test_shorter_exact_quote_from_verified_passage_is_accepted(self):
         with patch.object(service, 'chat', side_effect=[
             response('Patient reports neck discomfort. No other documented findings.'),
             response('Patient reports neck discomfort.')]):
-            packet = service.draft(case())
+            packet = service.draft_legacy(case())
         self.assertIn('neck discomfort', packet['report']['fields']['soap_1']['text'])
 
     def test_source_quote_is_immutable_when_drafting_references_verified_evidence(self):
@@ -49,7 +49,7 @@ class EvidenceTests(unittest.TestCase):
                                       'has_support':True,'evidence_ids':['E1'],
                                       'citations':[{'source_id':'s1','page':1,'quote':'Patient reports neck discomfort rated 7/1:10.'}]}}}
         with patch.object(service,'chat',side_effect=[extraction,synthesis]) as model:
-            report=service.draft(payload)['report']
+            report=service.draft_legacy(payload)['report']
         self.assertEqual(report['fields']['soap_1']['citations'][0]['quote'],quote)
         self.assertIn('7/10',report['fields']['soap_1']['text'])
         self.assertIn('DO NOT retype',model.call_args_list[1].args[0])
@@ -60,7 +60,7 @@ class EvidenceTests(unittest.TestCase):
         extraction={'fields':{'soap_4':{'citations':[{'source_id':'s1','page':1,'quote':'Patient reports neck discomfort.'}]}}}
         synthesis={'fields':{'soap_4':{'text':'Patient reports neck discomfort.','has_support':False,'evidence_ids':['E1']}}}
         with patch.object(service,'chat',side_effect=[extraction,synthesis]):
-            value=service.draft(payload)['report']['fields']['soap_4']
+            value=service.draft_legacy(payload)['report']['fields']['soap_4']
         self.assertEqual(value['text'],'')
 
     def test_protected_numeric_values_restore_exact_rating_dose_and_date(self):
@@ -87,24 +87,24 @@ class EvidenceTests(unittest.TestCase):
     def test_unchanged_evidence_reuses_extraction_but_changed_sources_invalidate_it(self):
         payload=case();payload['_evidence_cache']={}
         with patch.object(service,'chat',return_value=response()) as model:
-            service.draft(payload);self.assertEqual(model.call_count,2)
-            model.reset_mock();service.draft(payload);self.assertEqual(model.call_count,1)
+            service.draft_legacy(payload);self.assertEqual(model.call_count,2)
+            model.reset_mock();service.draft_legacy(payload);self.assertEqual(model.call_count,1)
             payload['sources'][0]['pages'][0]+=' A new clinician observation.'
-            model.reset_mock();service.draft(payload);self.assertEqual(model.call_count,2)
+            model.reset_mock();service.draft_legacy(payload);self.assertEqual(model.call_count,2)
 
     def test_unknown_evidence_id_cannot_support_this_section(self):
         bad={'fields':{'soap_1':{'text':'Unrelated assertion','has_support':True,'evidence_ids':['E99']}}}
         with patch.object(service, 'chat', side_effect=[
             response('Patient reports neck discomfort.'),
             bad]):
-            packet = service.draft(case())
+            packet = service.draft_legacy(case())
         self.assertEqual(packet['report']['fields']['soap_1']['text'], '')
 
     def test_cross_date_history_and_partial_evidence_are_requested(self):
         payload = case()
         payload['sources'][0]['pages'][0] = 'Intake dated 2025-12-01: Patient reports neck discomfort.'
         with patch.object(service, 'chat', return_value=response()) as model:
-            packet = service.draft(payload)
+            packet = service.draft_legacy(payload)
         prompt = model.call_args_list[0].args[0]
         self.assertIn('Use partial evidence', prompt)
         self.assertIn('2025-12-01', prompt)
@@ -114,7 +114,7 @@ class EvidenceTests(unittest.TestCase):
 
     def test_style_profile_reaches_model_without_sample_patient_details(self):
         with patch.object(service, 'chat', return_value=response()) as model:
-            service.draft(case())
+            service.draft_legacy(case())
         prompt = model.call_args_list[0].args[0]
         self.assertIn('writing_guidance', prompt)
         self.assertIn('Subjective:', prompt)
@@ -139,14 +139,14 @@ class EvidenceTests(unittest.TestCase):
                 self.assertIn(label, prompt)
             return {'fields': {i: {'text': '', 'citations': []} for i in ids}}
         with patch.object(service, 'chat', side_effect=empty_model) as model:
-            packet = service.draft(payload)
+            packet = service.draft_legacy(payload)
         self.assertEqual(model.call_count, 5)
         self.assertEqual(len(packet['report']['fields']), 13)
 
     def test_uncited_generated_text_is_discarded(self):
         bad = {'fields': {'soap_1': {'text': 'Unsupported finding', 'citations': []}}}
         with patch.object(service, 'chat', side_effect=[response(), bad]):
-            packet = service.draft(case())
+            packet = service.draft_legacy(case())
         self.assertEqual(packet['report']['fields']['soap_1']['text'], '')
 
     def test_duplicate_source_ids_and_missing_encounters_rejected(self):
@@ -204,6 +204,8 @@ class EvidenceTests(unittest.TestCase):
     def test_engine_check_requires_actual_cited_symptom_output(self):
         quote='The fictional patient reports neck discomfort rated 7/10 after a fictional collision.'
         def model(prompt, schema):
+            if 'text' not in next(iter(schema['properties']['fields']['properties'].values()))['properties']:
+                return {'fields':{key:{'evidence_ids':['P1'] if key=='soap_1' else []} for key in schema['properties']['fields']['properties']}}
             return {'fields':{key:{'text':('Patient reports neck discomfort rated {{N1}}.' if 'pattern' in schema['properties']['fields']['properties'][key]['properties'].get('text',{}) else 'Patient reports neck discomfort rated 7/10.') if key=='soap_1' else '',
                                   'has_support':key=='soap_1','evidence_ids':['E1'] if key=='soap_1' else [],
                                   'citations':[{'source_id':'engine_fixture','page':1,'quote':quote}] if key=='soap_1' else []}
